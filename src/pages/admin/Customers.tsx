@@ -28,8 +28,12 @@ interface Customer {
   email: string;
   phone: string;
   status: string;
+  credit_limit?: number;
+  payment_terms?: string;
+  tax_id?: string;
   city: string;
   country: string;
+  address_line1?: string;
   created_at: string;
 }
 
@@ -136,70 +140,122 @@ export default function AdminCustomers() {
           {loading ? (
             <div className="text-center py-8">Loading...</div>
           ) : filteredCustomers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No customers found
-            </div>
+            <div className="text-center py-8 text-muted-foreground">No customers found</div>
           ) : (
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Customer Code</th>
-                    <th>Company Name</th>
-                    <th>Contact Person</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Location</th>
-                    <th>Status</th>
-                    <th>Joined</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCustomers.map((customer) => (
-                    <tr key={customer.id}>
-                      <td className="font-medium">{customer.customer_code}</td>
-                      <td>{customer.company_name}</td>
-                      <td>{customer.contact_person}</td>
-                      <td>{customer.email}</td>
-                      <td>{customer.phone}</td>
-                      <td>{customer.city}, {customer.country}</td>
-                      <td><StatusBadge status={customer.status} /></td>
-                      <td>{new Date(customer.created_at).toLocaleDateString()}</td>
-                      <td>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewInventory(customer.id)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Inventory
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(customer)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              setCustomerToDelete(customer.id);
-                              setDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Mobile cards */}
+              <div className="md:hidden space-y-3">
+                {filteredCustomers.map((customer) => (
+                  <div key={customer.id} className="border border-border rounded-lg bg-card p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">{customer.customer_code} — {customer.company_name}</div>
+                      <StatusBadge status={customer.status} />
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-muted-foreground">Contact</div>
+                      <div className="text-right">{customer.contact_person}</div>
+                      <div className="text-muted-foreground">Email</div>
+                      <div className="text-right">{customer.email}</div>
+                      <div className="text-muted-foreground">Phone</div>
+                      <div className="text-right">{customer.phone}</div>
+                      <div className="text-muted-foreground">Type</div>
+                      <div className="text-right capitalize">{customer.customer_type}</div>
+                      <div className="text-muted-foreground">Address</div>
+                      <div className="text-right">{customer.address_line1 || '-'}</div>
+                      <div className="text-muted-foreground">Location</div>
+                      <div className="text-right">{customer.city}, {customer.country}</div>
+                      <div className="text-muted-foreground">Credit Limit</div>
+                      <div className="text-right">{typeof customer.credit_limit === 'number' ? `PKR ${customer.credit_limit.toFixed(2)}` : '-'}</div>
+                      <div className="text-muted-foreground">Payment</div>
+                      <div className="text-right">{customer.payment_terms || '-'}</div>
+                    </div>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleViewInventory(customer.id)}>
+                        <Eye className="h-4 w-4 mr-1" /> Inventory
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(customer)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          setCustomerToDelete(customer.id);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block w-full overflow-x-auto">
+                <div className="table-container min-w-[1100px] pr-4">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Customer Code</th>
+                        <th>Company Name</th>
+                        <th>Contact Person</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Type</th>
+                        <th>Address</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th>Credit Limit</th>
+                        <th>Payment Terms</th>
+                        <th>Tax ID</th>
+                        <th>Joined</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCustomers.map((customer) => (
+                        <tr key={customer.id}>
+                          <td className="font-medium whitespace-nowrap">{customer.customer_code}</td>
+                          <td className="whitespace-nowrap">{customer.company_name}</td>
+                          <td className="whitespace-nowrap">{customer.contact_person}</td>
+                          <td className="whitespace-nowrap">{customer.email}</td>
+                          <td className="whitespace-nowrap">{customer.phone}</td>
+                          <td className="capitalize whitespace-nowrap">{customer.customer_type}</td>
+                          <td className="whitespace-nowrap">{customer.address_line1 || '-'}</td>
+                          <td className="whitespace-nowrap">{customer.city}, {customer.country}</td>
+                          <td><StatusBadge status={customer.status} /></td>
+                          <td className="whitespace-nowrap">{typeof customer.credit_limit === 'number' ? `PKR ${customer.credit_limit.toFixed(2)}` : '-'}</td>
+                          <td className="whitespace-nowrap">{customer.payment_terms || '-'}</td>
+                          <td className="whitespace-nowrap">{customer.tax_id || '-'}</td>
+                          <td className="whitespace-nowrap">{new Date(customer.created_at).toLocaleDateString()}</td>
+                          <td>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => handleViewInventory(customer.id)}>
+                                <Eye className="h-4 w-4 mr-1" /> Inventory
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleEdit(customer)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  setCustomerToDelete(customer.id);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

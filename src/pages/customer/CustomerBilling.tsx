@@ -95,30 +95,55 @@ export default function CustomerBilling() {
               No charges found
             </div>
           ) : (
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Order Number</th>
-                    <th>Date</th>
-                    <th>Handling</th>
-                    <th>Delivery</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentCharges.map((charge) => (
-                    <tr key={charge.id}>
-                      <td className="font-medium">{charge.order_number}</td>
-                      <td>{new Date(charge.created_at).toLocaleDateString()}</td>
-                      <td>PKR {charge.handling_charges?.toFixed(2)}</td>
-                      <td>PKR {charge.delivery_charges?.toFixed(2)}</td>
-                      <td className="font-bold">PKR {charge.total_charges?.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Mobile cards */}
+              <div className="md:hidden space-y-3">
+                {recentCharges.map((charge) => (
+                  <div key={charge.id} className="border border-border rounded-lg bg-card p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">{charge.order_number}</div>
+                      <div className="text-sm text-muted-foreground">{new Date(charge.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-muted-foreground">Handling</div>
+                      <div className="text-right">PKR {charge.handling_charges?.toFixed(2)}</div>
+                      <div className="text-muted-foreground">Delivery</div>
+                      <div className="text-right">PKR {charge.delivery_charges?.toFixed(2)}</div>
+                      <div className="text-muted-foreground">Total</div>
+                      <div className="text-right font-semibold">PKR {charge.total_charges?.toFixed(2)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block w-full overflow-x-auto">
+                <div className="table-container min-w-[720px] pr-4">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Order Number</th>
+                        <th>Date</th>
+                        <th>Handling</th>
+                        <th>Delivery</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentCharges.map((charge) => (
+                        <tr key={charge.id}>
+                          <td className="font-medium whitespace-nowrap">{charge.order_number}</td>
+                          <td className="whitespace-nowrap">{new Date(charge.created_at).toLocaleDateString()}</td>
+                          <td className="whitespace-nowrap">PKR {charge.handling_charges?.toFixed(2)}</td>
+                          <td className="whitespace-nowrap">PKR {charge.delivery_charges?.toFixed(2)}</td>
+                          <td className="font-bold whitespace-nowrap">PKR {charge.total_charges?.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

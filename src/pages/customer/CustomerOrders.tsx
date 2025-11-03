@@ -10,10 +10,16 @@ interface Order {
   order_number: string;
   status: string;
   order_type: string;
+  priority?: string;
   requested_date: string;
+  scheduled_date?: string | null;
+  completed_date?: string | null;
   total_items: number;
   total_quantity: number;
   total_charges: number;
+  delivery_contact_name?: string | null;
+  delivery_contact_phone?: string | null;
+  delivery_city?: string | null;
   warehouses: {
     warehouse_name: string;
   };
@@ -87,34 +93,75 @@ export default function CustomerOrders() {
               No orders found
             </div>
           ) : (
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Order Number</th>
-                    <th>Warehouse</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Items</th>
-                    <th>Requested Date</th>
-                    <th>Charges</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredOrders.map((order) => (
-                    <tr key={order.id}>
-                      <td className="font-medium">{order.order_number}</td>
-                      <td>{order.warehouses?.warehouse_name}</td>
-                      <td className="capitalize">{order.order_type}</td>
-                      <td><StatusBadge status={order.status} /></td>
-                      <td>{order.total_items} ({order.total_quantity} units)</td>
-                      <td>{new Date(order.requested_date).toLocaleDateString()}</td>
-                      <td className="font-medium">PKR {order.total_charges?.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Mobile cards */}
+              <div className="md:hidden space-y-3">
+                {filteredOrders.map((order) => (
+                  <div key={order.id} className="border border-border rounded-lg bg-card p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">{order.order_number}</div>
+                      <StatusBadge status={order.status} />
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-muted-foreground">Warehouse</div>
+                      <div className="text-right">{order.warehouses?.warehouse_name}</div>
+                      <div className="text-muted-foreground">Type</div>
+                      <div className="text-right capitalize">{order.order_type}</div>
+                      <div className="text-muted-foreground">Priority</div>
+                      <div className="text-right capitalize">{order.priority || '-'}</div>
+                      <div className="text-muted-foreground">Items</div>
+                      <div className="text-right">{order.total_items} ({order.total_quantity})</div>
+                      <div className="text-muted-foreground">Requested</div>
+                      <div className="text-right">{new Date(order.requested_date).toLocaleDateString()}</div>
+                      <div className="text-muted-foreground">Charges</div>
+                      <div className="text-right font-medium">PKR {order.total_charges?.toFixed(2)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block w-full overflow-x-auto">
+                <div className="table-container min-w-[960px] pr-4">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Order Number</th>
+                        <th>Warehouse</th>
+                        <th>Type</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Items</th>
+                        <th>Requested Date</th>
+                        <th>Scheduled</th>
+                        <th>Completed</th>
+                        <th>Charges</th>
+                        <th>Contact</th>
+                        <th>City</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOrders.map((order) => (
+                        <tr key={order.id}>
+                          <td className="font-medium whitespace-nowrap">{order.order_number}</td>
+                          <td className="whitespace-nowrap">{order.warehouses?.warehouse_name}</td>
+                          <td className="capitalize whitespace-nowrap">{order.order_type}</td>
+                          <td className="capitalize whitespace-nowrap">{order.priority || '-'}</td>
+                          <td><StatusBadge status={order.status} /></td>
+                          <td className="whitespace-nowrap">{order.total_items} ({order.total_quantity} units)</td>
+                          <td className="whitespace-nowrap">{new Date(order.requested_date).toLocaleDateString()}</td>
+                          <td className="whitespace-nowrap">{order.scheduled_date ? new Date(order.scheduled_date).toLocaleDateString() : '-'}</td>
+                          <td className="whitespace-nowrap">{order.completed_date ? new Date(order.completed_date).toLocaleDateString() : '-'}</td>
+                          <td className="font-medium whitespace-nowrap">PKR {order.total_charges?.toFixed(2)}</td>
+                          <td className="whitespace-nowrap">{order.delivery_contact_name || '-'}{order.delivery_contact_phone ? ` (${order.delivery_contact_phone})` : ''}</td>
+                          <td className="whitespace-nowrap">{order.delivery_city || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

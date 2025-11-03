@@ -23,9 +23,18 @@ interface InventoryItem {
   id: string;
   item_code: string;
   item_name: string;
+  sku?: string;
+  category?: string;
   customer_id: string;
   warehouse_id: string;
   quantity: number;
+  unit_of_measure?: string;
+  weight?: number;
+  weight_unit?: string;
+  dimension_length?: number;
+  dimension_width?: number;
+  dimension_height?: number;
+  dimension_unit?: string;
   status: string;
   received_date: string;
   customers: {
@@ -143,72 +152,128 @@ export default function AdminInventory() {
             </div>
           </div>
 
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Item Code</th>
-                  <th>Item Name</th>
-                  <th>Customer</th>
-                  <th>Warehouse</th>
-                  <th>Quantity</th>
-                  <th>Status</th>
-                  <th>Received Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                      Loading inventory...
-                    </td>
-                  </tr>
-                ) : filteredItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No items found
-                    </td>
-                  </tr>
-                ) : (
-                  filteredItems.map((item) => (
-                    <tr key={item.id}>
-                      <td className="font-medium">{item.item_code}</td>
-                      <td>{item.item_name}</td>
-                      <td>{item.customers?.company_name || item.customers?.contact_person}</td>
-                      <td>{item.warehouses?.warehouse_name}</td>
-                      <td>{item.quantity}</td>
-                      <td>
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td>{new Date(item.received_date).toLocaleDateString()}</td>
-                      <td>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(item)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              setItemToDelete(item.id);
-                              setDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-3">
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading inventory...</div>
+              ) : filteredItems.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No items found</div>
+              ) : (
+                filteredItems.map((item) => (
+                  <div key={item.id} className="border border-border rounded-lg bg-card p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">{item.item_code} — {item.item_name}</div>
+                      <StatusBadge status={item.status} />
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-muted-foreground">Customer</div>
+                      <div className="text-right">{item.customers?.company_name || item.customers?.contact_person}</div>
+                      <div className="text-muted-foreground">Warehouse</div>
+                      <div className="text-right">{item.warehouses?.warehouse_name}</div>
+                      <div className="text-muted-foreground">SKU</div>
+                      <div className="text-right">{item.sku || '-'}</div>
+                      <div className="text-muted-foreground">Category</div>
+                      <div className="text-right capitalize">{item.category || '-'}</div>
+                      <div className="text-muted-foreground">Qty</div>
+                      <div className="text-right">{item.quantity} {item.unit_of_measure || 'pcs'}</div>
+                      <div className="text-muted-foreground">Weight</div>
+                      <div className="text-right">{item.weight ? `${item.weight} ${item.weight_unit || 'kg'}` : '-'}</div>
+                      <div className="text-muted-foreground">Size</div>
+                      <div className="text-right">{item.dimension_length && item.dimension_width && item.dimension_height ? `${item.dimension_length}×${item.dimension_width}×${item.dimension_height} ${item.dimension_unit || 'cm'}` : '-'}</div>
+                      <div className="text-muted-foreground">Received</div>
+                      <div className="text-right">{new Date(item.received_date).toLocaleDateString()}</div>
+                    </div>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          setItemToDelete(item.id);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block w-full overflow-x-auto">
+              <div className="table-container min-w-[920px] pr-4">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Item Code</th>
+                      <th>Item Name</th>
+                      <th>SKU</th>
+                      <th>Category</th>
+                      <th>Customer</th>
+                      <th>Warehouse</th>
+                      <th>Quantity</th>
+                      <th>UoM</th>
+                      <th>Weight</th>
+                      <th>Dimensions</th>
+                      <th>Status</th>
+                      <th>Received Date</th>
+                      <th>Actions</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={13} className="text-center py-8 text-muted-foreground">Loading inventory...</td>
+                      </tr>
+                    ) : filteredItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={13} className="text-center py-8 text-muted-foreground">No items found</td>
+                      </tr>
+                    ) : (
+                      filteredItems.map((item) => (
+                        <tr key={item.id}>
+                          <td className="font-medium whitespace-nowrap">{item.item_code}</td>
+                          <td className="whitespace-nowrap">{item.item_name}</td>
+                          <td className="whitespace-nowrap">{item.sku || '-'}</td>
+                          <td className="capitalize whitespace-nowrap">{item.category || '-'}</td>
+                          <td className="whitespace-nowrap">{item.customers?.company_name || item.customers?.contact_person}</td>
+                          <td className="whitespace-nowrap">{item.warehouses?.warehouse_name}</td>
+                          <td className="whitespace-nowrap">{item.quantity}</td>
+                          <td className="whitespace-nowrap">{item.unit_of_measure || 'pcs'}</td>
+                          <td className="whitespace-nowrap">{item.weight ? `${item.weight} ${item.weight_unit || 'kg'}` : '-'}</td>
+                          <td className="whitespace-nowrap">{item.dimension_length && item.dimension_width && item.dimension_height ? `${item.dimension_length}×${item.dimension_width}×${item.dimension_height} ${item.dimension_unit || 'cm'}` : '-'}</td>
+                          <td><StatusBadge status={item.status} /></td>
+                          <td className="whitespace-nowrap">{new Date(item.received_date).toLocaleDateString()}</td>
+                          <td>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  setItemToDelete(item.id);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         </CardContent>
       </Card>
 
