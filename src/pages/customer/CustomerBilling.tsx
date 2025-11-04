@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KPICard } from "@/components/KPICard";
+import Spinner from "@/components/Spinner";
+import { formatCurrency } from "@/lib/currency";
 import { DollarSign, TrendingUp, Package } from "lucide-react";
 
 export default function CustomerBilling() {
@@ -66,16 +68,8 @@ export default function CustomerBilling() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KPICard
-          title="Total Charges"
-          value={`PKR ${stats.totalCharges.toFixed(2)}`}
-          icon={DollarSign}
-        />
-        <KPICard
-          title="This Month"
-          value={`PKR ${stats.monthlyCharges.toFixed(2)}`}
-          icon={TrendingUp}
-        />
+        <KPICard title="Total Charges" value={formatCurrency(stats.totalCharges)} icon={DollarSign} />
+        <KPICard title="This Month" value={formatCurrency(stats.monthlyCharges)} icon={TrendingUp} />
         <KPICard
           title="Total Orders"
           value={stats.totalOrders}
@@ -89,7 +83,7 @@ export default function CustomerBilling() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading...</div>
+            <div className="flex items-center justify-center py-12"><Spinner label="Loading charges" /></div>
           ) : recentCharges.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No charges found
@@ -99,18 +93,18 @@ export default function CustomerBilling() {
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
                 {recentCharges.map((charge) => (
-                  <div key={charge.id} className="border border-border rounded-lg bg-card p-4">
+                  <div key={charge.id} className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="font-semibold">{charge.order_number}</div>
                       <div className="text-sm text-muted-foreground">{new Date(charge.created_at).toLocaleDateString()}</div>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-muted-foreground">Handling</div>
-                      <div className="text-right">PKR {charge.handling_charges?.toFixed(2)}</div>
-                      <div className="text-muted-foreground">Delivery</div>
-                      <div className="text-right">PKR {charge.delivery_charges?.toFixed(2)}</div>
-                      <div className="text-muted-foreground">Total</div>
-                      <div className="text-right font-semibold">PKR {charge.total_charges?.toFixed(2)}</div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm">
+                      <div className="text-muted-foreground text-xs">Handling</div>
+                      <div className="text-right">{formatCurrency(charge.handling_charges ?? 0)}</div>
+                      <div className="text-muted-foreground text-xs">Delivery</div>
+                      <div className="text-right">{formatCurrency(charge.delivery_charges ?? 0)}</div>
+                      <div className="text-muted-foreground text-xs">Total</div>
+                      <div className="text-right font-semibold">{formatCurrency(charge.total_charges ?? 0)}</div>
                     </div>
                   </div>
                 ))}
@@ -134,9 +128,9 @@ export default function CustomerBilling() {
                         <tr key={charge.id}>
                           <td className="font-medium whitespace-nowrap">{charge.order_number}</td>
                           <td className="whitespace-nowrap">{new Date(charge.created_at).toLocaleDateString()}</td>
-                          <td className="whitespace-nowrap">PKR {charge.handling_charges?.toFixed(2)}</td>
-                          <td className="whitespace-nowrap">PKR {charge.delivery_charges?.toFixed(2)}</td>
-                          <td className="font-bold whitespace-nowrap">PKR {charge.total_charges?.toFixed(2)}</td>
+                          <td className="whitespace-nowrap">{formatCurrency(charge.handling_charges ?? 0)}</td>
+                          <td className="whitespace-nowrap">{formatCurrency(charge.delivery_charges ?? 0)}</td>
+                          <td className="font-bold whitespace-nowrap">{formatCurrency(charge.total_charges ?? 0)}</td>
                         </tr>
                       ))}
                     </tbody>

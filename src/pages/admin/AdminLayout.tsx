@@ -16,6 +16,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import Spinner from "@/components/Spinner";
 
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -42,7 +43,7 @@ export default function AdminLayout() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -59,48 +60,50 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex w-full">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex md:w-64 bg-sidebar border-r border-sidebar-border flex-col">
-        <div className="p-6 border-b border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Package className="h-6 w-6 text-primary" />
+      <aside className="hidden md:flex md:w-64 bg-sidebar border-r border-sidebar-border flex-col shadow-lg">
+        <div className="p-5 border-b border-sidebar-border">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary/10 rounded-xl shadow-sm">
+              <Package className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-sidebar-foreground">
-                Depot Buddy
+              <h1 className="text-base font-bold text-sidebar-foreground tracking-tight">
+                HSEcommerce
               </h1>
-              <p className="text-xs text-sidebar-foreground/60">Admin Portal</p>
+              <p className="text-xs text-sidebar-foreground/60 mt-0.5">
+                Admin Portal
+              </p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-3 space-y-2">
           {navigation.map((item) => (
             <NavLink
               key={item.name}
               to={item.href}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-primary"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    ? "bg-primary text-foreground shadow-md"
+                    : "text-white hover:bg-primary/20 hover:text-white"
                 )
               }
             >
-              <item.icon className="h-5 w-5" />
-              {item.name}
+              <item.icon className="h-4 w-4 flex-shrink-0" />
+              <span>{item.name}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-3 border-t border-sidebar-border">
           <Button
             variant="ghost"
-            className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
+            className="w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-all duration-200 rounded-xl"
             onClick={handleLogout}
           >
-            <LogOut className="mr-3 h-5 w-5" />
+            <LogOut className="mr-3 h-4 w-4" />
             Logout
           </Button>
         </div>
@@ -124,57 +127,57 @@ export default function AdminLayout() {
         {/* Drawer */}
         <aside
           className={cn(
-            "absolute left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border flex flex-col transform transition-transform",
+            "absolute left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border flex flex-col transform transition-transform duration-300 ease-out shadow-2xl",
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <div className="p-6 border-b border-sidebar-border">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Package className="h-6 w-6 text-primary" />
+          <div className="p-5 border-b border-sidebar-border">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-primary/10 rounded-xl shadow-sm">
+                <Package className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-sidebar-foreground">
-                  Depot Buddy
+                <h1 className="text-base font-bold text-sidebar-foreground tracking-tight">
+                  HSEcommerce
                 </h1>
-                <p className="text-xs text-sidebar-foreground/60">
+                <p className="text-xs text-sidebar-foreground/60 mt-0.5">
                   Admin Portal
                 </p>
               </div>
             </div>
           </div>
 
-          <nav className="flex-1 p-4 space-y-1">
+          <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
             {navigation.map((item) => (
               <NavLink
                 key={item.name}
                 to={item.href}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                     isActive
-                      ? "bg-sidebar-accent text-sidebar-primary"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      ? "bg-primary text-foreground shadow-md"
+                      : "text-white hover:bg-primary/20 hover:text-white"
                   )
                 }
                 onClick={() => setMobileOpen(false)}
               >
-                <item.icon className="h-5 w-5" />
-                {item.name}
+                <item.icon className="h-4 w-4 flex-shrink-0" />
+                <span>{item.name}</span>
               </NavLink>
             ))}
           </nav>
 
-          <div className="p-4 border-t border-sidebar-border">
+          <div className="p-3 border-t border-sidebar-border">
             <Button
               variant="ghost"
-              className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
+              className="w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-all duration-200 rounded-xl"
               onClick={() => {
                 setMobileOpen(false);
                 handleLogout();
               }}
             >
-              <LogOut className="mr-3 h-5 w-5" />
+              <LogOut className="mr-3 h-4 w-4" />
               Logout
             </Button>
           </div>
@@ -184,23 +187,25 @@ export default function AdminLayout() {
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
         {/* Top bar for mobile */}
-        <div className="md:hidden sticky top-0 z-30 bg-background border-b border-border px-4 py-3 flex items-center justify-between">
+        <div className="md:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border shadow-sm px-4 py-3 flex items-center justify-between">
           <button
             type="button"
             aria-label="Open menu"
-            className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2"
+            className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-3 py-2 hover:bg-muted transition-colors shadow-sm"
             onClick={() => setMobileOpen(true)}
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
             <Package className="h-5 w-5 text-primary" />
-            <span className="font-semibold">Depot Buddy</span>
+            <span className="font-semibold text-sm tracking-tight">
+              HSEcommerce
+            </span>
           </div>
-          <div />
+          <div className="w-12" />
         </div>
 
-        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-7xl">
           <Outlet />
         </div>
       </main>

@@ -1,41 +1,46 @@
+/* ============================================
+   IMPROVED INDEX.CSS
+   Enhanced design system with better organization
+   ============================================ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* ============================================
+      DESIGN SYSTEM - CSS VARIABLES
+      ============================================ */
 
 @layer base {
   :root {
-    /* Slightly off-white background for better contrast */
-    --background: 210 20% 99%;
+    /* Surfaces */
+    --background: 210 14% 98%;
 
-    /* Dark charcoal for primary text */
-    --foreground: 215 25% 13%;
+    /* Text */
+    --foreground: 215 18% 15%;
 
-    /* White cards with subtle borders */
+    /* Cards */
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 13%;
+    --card-foreground: 215 18% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 13%;
+    --popover-foreground: 215 18% 15%;
 
-    /* Professional yellow accent - the star of the show */
-    --primary: 45 100% 51%;
-    --primary-foreground: 0 0% 100%;
+    /* Brand yellow */
+    --primary: 45 92% 48%;
+    --primary-foreground: 0 0% 8%;
 
-    /* Subtle gray for secondary elements */
-    --secondary: 215 20% 92%;
-    --secondary-foreground: 215 25% 13%;
+    /* Secondary */
+    --secondary: 210 22% 95%;
+    --secondary-foreground: 215 18% 20%;
 
-    /* Muted gray for helper text */
-    --muted: 215 20% 92%;
-    --muted-foreground: 215 14% 38%;
+    /* Muted */
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 12% 40%;
 
     /* Accent uses primary yellow */
-    --accent: 45 100% 51%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 45 92% 48%;
+    --accent-foreground: 0 0% 8%;
 
     /* System colors */
     --destructive: 0 84% 60%;
@@ -50,27 +55,32 @@ All colors MUST be HSL.
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
 
-    /* Darker, more visible borders */
-    --border: 215 16% 75%;
-    --input: 215 16% 75%;
-    --ring: 45 100% 51%;
+    /* Borders & focus */
+    --border: 215 14% 72%;
+    --input: 215 14% 72%;
+    --ring: 45 92% 48%;
 
-    --radius: 0.5rem;
+    /* Shape & elevation */
+    --radius: 0.75rem;
+    --radius-lg: 1rem;
+    --shadow-sm: 0 1px 2px hsl(215 20% 20% / 0.06), 0 1px 1px hsl(215 20% 20% / 0.04);
+    --shadow-md: 0 2px 8px hsl(215 20% 20% / 0.08), 0 1px 3px hsl(215 20% 20% / 0.06);
+    --shadow-lg: 0 4px 16px hsl(215 20% 20% / 0.12), 0 2px 6px hsl(215 20% 20% / 0.08);
 
     /* Dark sidebar for admin portal */
     --sidebar-background: 215 25% 13%;
     --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 45 100% 51%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 45 92% 48%;
+    --sidebar-primary-foreground: 0 0% 8%;
     --sidebar-accent: 215 25% 20%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 215 25% 20%;
-    --sidebar-ring: 45 100% 51%;
+    --sidebar-ring: 45 92% 48%;
 
-    /* Table styles (higher contrast) */
-    --table-header: 210 20% 94%;
-    --table-border: 215 16% 75%;
-    --table-hover: 210 20% 96%;
+    /* Tables */
+    --table-header: 210 18% 95%;
+    --table-border: 215 14% 72%;
+    --table-hover: 210 16% 97%;
 
     /* Status colors */
     --status-pending: 38 92% 50%;
@@ -78,6 +88,18 @@ All colors MUST be HSL.
     --status-in-progress: 217 91% 60%;
     --status-completed: 142 71% 45%;
     --status-cancelled: 0 84% 60%;
+
+    /* Animation durations */
+    --duration-fast: 150ms;
+    --duration-normal: 250ms;
+    --duration-slow: 350ms;
+
+    /* Spacing scale */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
   }
 
   .dark {
@@ -90,8 +112,8 @@ All colors MUST be HSL.
     --popover: 215 25% 16%;
     --popover-foreground: 0 0% 100%;
 
-    --primary: 45 100% 51%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 45 92% 48%;
+    --primary-foreground: 0 0% 8%;
 
     --secondary: 215 25% 20%;
     --secondary-foreground: 0 0% 100%;
@@ -99,30 +121,38 @@ All colors MUST be HSL.
     --muted: 215 25% 20%;
     --muted-foreground: 215 14% 60%;
 
-    --accent: 45 100% 51%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 45 92% 48%;
+    --accent-foreground: 0 0% 8%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 215 25% 20%;
     --input: 215 25% 20%;
-    --ring: 45 100% 51%;
+    --ring: 45 92% 48%;
 
     --sidebar-background: 215 25% 10%;
     --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 45 100% 51%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 45 92% 48%;
+    --sidebar-primary-foreground: 0 0% 8%;
     --sidebar-accent: 215 25% 16%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 215 25% 16%;
-    --sidebar-ring: 45 100% 51%;
+    --sidebar-ring: 45 92% 48%;
 
     --table-header: 215 25% 16%;
     --table-border: 215 25% 20%;
     --table-hover: 215 25% 20%;
+
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.16), 0 1px 1px hsl(0 0% 0% / 0.12);
+    --shadow-md: 0 2px 8px hsl(0 0% 0% / 0.2), 0 1px 3px hsl(0 0% 0% / 0.16);
+    --shadow-lg: 0 4px 16px hsl(0 0% 0% / 0.24), 0 2px 6px hsl(0 0% 0% / 0.18);
   }
 }
+
+/* ============================================
+      BASE STYLES
+      ============================================ */
 
 @layer base {
   * {
@@ -140,6 +170,9 @@ All colors MUST be HSL.
       "Oxygen",
       "Ubuntu",
       sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1,
@@ -149,77 +182,516 @@ All colors MUST be HSL.
   h5,
   h6 {
     @apply font-semibold;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    @apply text-3xl;
+  }
+
+  h2 {
+    @apply text-2xl;
+  }
+
+  h3 {
+    @apply text-xl;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Focus visible styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 }
+
+/* ============================================
+      COMPONENT UTILITIES
+      ============================================ */
 
 @layer utilities {
   /* Status badges */
   .status-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shadow-sm;
+    transition: all var(--duration-fast) ease;
   }
 
   .status-pending {
-    @apply bg-warning/10 text-warning border border-warning/20;
+    @apply bg-warning text-white border border-warning/20;
   }
 
   .status-approved,
   .status-completed {
-    @apply bg-success/10 text-success border border-success/20;
+    @apply bg-success text-white border border-success/20;
   }
 
   .status-in-progress {
-    @apply bg-info/10 text-info border border-info/20;
+    @apply bg-info text-white border border-info/20;
   }
 
   .status-cancelled {
-    @apply bg-destructive/10 text-destructive border border-destructive/20;
+    @apply bg-destructive text-white border border-destructive/20;
+  }
+
+  /* Additional explicit statuses for distinct colors */
+  .status-processing {
+    @apply bg-sky-500 text-white border border-sky-200;
+  }
+  .status-ready {
+    @apply bg-violet-500 text-white border border-violet-200;
+  }
+  .status-in-transit {
+    @apply bg-blue-500 text-white border border-blue-200;
+  }
+  .status-completed {
+    @apply bg-success text-white border border-success/20;
   }
 
   /* Table utilities */
   .table-container {
     @apply rounded-lg bg-card;
-    overflow: visible; /* let the outer wrapper control scrolling to avoid double scrollbars */
+    box-shadow: var(--shadow-sm);
+    overflow: visible;
   }
 
   .data-table {
     @apply w-full border border-border;
     border-collapse: separate;
     border-spacing: 0;
+    border-radius: var(--radius-lg);
   }
 
   .data-table thead {
-    @apply bg-muted/50;
+    @apply bg-primary/5;
   }
 
   .data-table th {
-    @apply px-4 py-3 text-left text-sm font-semibold text-foreground border-b border-border;
+    @apply px-6 py-3.5 text-left text-xs font-semibold tracking-wide uppercase text-foreground/80 border-b border-border/50 sticky top-0 bg-primary/5;
+    backdrop-filter: blur(8px);
   }
 
   .data-table td {
-    @apply px-4 py-3 text-sm text-foreground border-b border-border;
+    @apply px-6 py-4 text-sm text-foreground border-b border-border/30 align-middle;
+    transition: background-color var(--duration-fast) ease;
   }
 
-  /* Add right gutter so content isn't clipped by rounded container when scrolled to the edge */
   .data-table th:last-child,
   .data-table td:last-child {
-    padding-right: 1.5rem; /* 24px */
+    padding-right: 1.5rem;
   }
 
   .data-table tbody tr {
-    @apply hover:bg-muted/30 transition-colors;
+    @apply hover:bg-[hsl(var(--table-hover))];
+    transition: background-color var(--duration-fast) ease;
+  }
+
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
   }
 
   /* KPI Card */
   .kpi-card {
-    @apply bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow;
+    @apply bg-card border border-border/50 rounded-[var(--radius-lg)] p-6;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--duration-normal) ease;
   }
 
-  /* Form utilities */
-  .form-label {
-    @apply text-sm font-medium text-foreground mb-1.5;
+  .kpi-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
   }
 
-  .form-input {
-    @apply w-full px-3 py-2 border border-input rounded-md focus:ring-2 focus:ring-primary focus:border-primary transition-colors;
+  /* Loading spinner */
+  .loader-spinner {
+    @apply animate-spin rounded-full h-12 w-12 border-b-2 border-primary;
+  }
+}
+
+/* ============================================
+      DASHBOARD SPECIFIC STYLES
+      ============================================ */
+
+@layer components {
+  /* Dashboard Container */
+  .dashboard-container {
+    @apply space-y-8 pb-8;
+    animation: fadeIn var(--duration-normal) ease-out;
+  }
+
+  /* Dashboard Header */
+  .dashboard-header {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4;
+  }
+
+  .dashboard-title {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .dashboard-subtitle {
+    @apply text-muted-foreground mt-1 text-sm;
+  }
+
+  .refresh-button {
+    @apply self-start sm:self-auto;
+    transition: all var(--duration-fast) ease;
+  }
+
+  .refresh-button:hover:not(:disabled) {
+    @apply bg-muted;
+  }
+
+  /* KPI Grid */
+  .kpi-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6;
+  }
+
+  /* Orders Card */
+  .orders-card {
+    @apply border-border/50 shadow-sm;
+    transition: box-shadow var(--duration-normal) ease;
+  }
+
+  .orders-card-header {
+    @apply pb-3;
+  }
+
+  .orders-card-title {
+    @apply text-xl;
+  }
+
+  .orders-card-content {
+    @apply px-0 sm:px-6;
+  }
+
+  /* Empty State */
+  .empty-state {
+    @apply text-center py-12 text-muted-foreground;
+  }
+
+  .empty-state-icon {
+    @apply h-12 w-12 mx-auto mb-3 opacity-20;
+  }
+
+  .empty-state-text {
+    @apply text-sm;
+  }
+
+  /* Mobile Orders */
+  .orders-mobile {
+    @apply md:hidden space-y-3 px-4 sm:px-6;
+  }
+
+  .order-card-mobile {
+    @apply border border-border/50 rounded-lg bg-card p-4;
+    transition: all var(--duration-fast) ease;
+  }
+
+  .order-card-mobile:hover {
+    @apply bg-muted/30;
+  }
+
+  .order-card-header-mobile {
+    @apply flex items-start justify-between mb-3;
+  }
+
+  .order-number-mobile {
+    @apply font-semibold text-sm;
+  }
+
+  .order-customer-mobile {
+    @apply text-xs text-muted-foreground mt-0.5;
+  }
+
+  .order-details-mobile {
+    @apply grid grid-cols-2 gap-3 text-sm;
+  }
+
+  .order-label {
+    @apply text-xs text-muted-foreground mb-1;
+  }
+
+  .order-value {
+    @apply font-medium;
+  }
+
+  /* Desktop Orders */
+  .orders-desktop {
+    @apply hidden md:block overflow-x-auto;
+  }
+
+  /* Dashboard Loader */
+  .dashboard-loader {
+    @apply flex items-center justify-center min-h-[60vh];
+  }
+}
+
+/* ============================================
+      ANIMATIONS
+      ============================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ============================================
+      PRINT STYLES
+      ============================================ */
+
+@media print {
+  .dashboard-header button,
+  .orders-mobile {
+    display: none !important;
+  }
+
+  .orders-desktop {
+    display: block !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .kpi-card,
+  .orders-card {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+  }
+}
+
+/* ============================================
+      ACCESSIBILITY
+      ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .data-table {
+    border-width: 2px;
+  }
+
+  .status-badge {
+    border-width: 2px;
+  }
+}
+/* Add this to your existing index.css file */
+
+/* ============================================
+   REPORTS & ANALYTICS STYLES
+   ============================================ */
+
+@layer components {
+  /* Reports Container */
+  .reports-container {
+    @apply space-y-8 pb-8;
+    animation: fadeIn var(--duration-normal) ease-out;
+  }
+
+  /* Reports Header */
+  .reports-header {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4;
+  }
+
+  .reports-header-content {
+    @apply flex items-center gap-3;
+  }
+
+  .reports-icon-wrapper {
+    @apply p-3 bg-primary/10 rounded-lg;
+    transition: all var(--duration-normal) ease;
+  }
+
+  .reports-icon-wrapper:hover {
+    @apply bg-primary/15;
+    transform: scale(1.05);
+  }
+
+  .reports-title {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .reports-subtitle {
+    @apply text-muted-foreground text-sm mt-1;
+  }
+
+  /* Charts Grid */
+  .charts-grid {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-6;
+  }
+
+  .chart-card {
+    @apply border-border/50 shadow-sm;
+    transition: all var(--duration-normal) ease;
+  }
+
+  .chart-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .chart-card .recharts-wrapper {
+    @apply rounded-lg;
+  }
+
+  /* Responsive chart adjustments */
+  @media (max-width: 640px) {
+    .charts-grid {
+      @apply gap-4;
+    }
+
+    .chart-card {
+      @apply shadow-none;
+    }
+
+    .reports-icon-wrapper {
+      @apply p-2;
+    }
+
+    .reports-title {
+      @apply text-2xl;
+    }
+  }
+}
+
+/* ============================================
+     CHART COMPONENT OVERRIDES
+     ============================================ */
+
+@layer utilities {
+  /* Recharts customization */
+  .recharts-cartesian-grid-horizontal line,
+  .recharts-cartesian-grid-vertical line {
+    @apply stroke-border/30;
+  }
+
+  .recharts-legend-item-text {
+    @apply text-foreground/80 text-xs;
+  }
+
+  .recharts-default-legend {
+    @apply flex justify-center gap-4 flex-wrap;
+  }
+
+  /* Tooltip styling */
+  .recharts-tooltip-wrapper {
+    filter: drop-shadow(0 4px 6px hsl(var(--foreground) / 0.1));
+  }
+
+  /* Chart animations */
+  .recharts-surface {
+    animation: chartFadeIn var(--duration-slow) ease-out;
+  }
+
+  /* Custom chart text colors */
+  .recharts-text {
+    @apply fill-foreground/70;
+  }
+
+  .recharts-label {
+    @apply fill-foreground/80 text-xs;
+  }
+}
+
+/* ============================================
+     CHART ANIMATIONS
+     ============================================ */
+
+@keyframes chartFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ============================================
+     PRINT STYLES FOR REPORTS
+     ============================================ */
+
+@media print {
+  .reports-header button {
+    display: none !important;
+  }
+
+  .charts-grid {
+    display: block !important;
+  }
+
+  .chart-card {
+    page-break-inside: avoid;
+    margin-bottom: 2rem;
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  .reports-container {
+    padding-bottom: 0 !important;
+  }
+
+  /* Ensure charts are visible in print */
+  .recharts-wrapper svg {
+    max-width: 100% !important;
+  }
+}
+
+/* ============================================
+     DARK MODE CHART ADJUSTMENTS
+     ============================================ */
+
+.dark {
+  .recharts-cartesian-grid-horizontal line,
+  .recharts-cartesian-grid-vertical line {
+    @apply stroke-border/20;
+  }
+
+  .recharts-text {
+    @apply fill-foreground/60;
+  }
+
+  .chart-card {
+    @apply bg-card/50;
+    backdrop-filter: blur(8px);
   }
 }

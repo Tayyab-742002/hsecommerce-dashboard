@@ -359,7 +359,7 @@ export default function CustomerFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="credit_limit">Credit Limit (PKR)</Label>
+              <Label htmlFor="credit_limit">Credit Limit (USD)</Label>
               <Input
                 id="credit_limit"
                 type="number"

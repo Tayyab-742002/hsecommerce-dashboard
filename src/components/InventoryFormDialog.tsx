@@ -256,7 +256,7 @@ export default function InventoryFormDialog({ open, onOpenChange, item, onSucces
               </Select>
             </div>
             <div>
-              <Label htmlFor="declared_value">Declared Value (PKR)</Label>
+              <Label htmlFor="declared_value">Declared Value (USD)</Label>
               <Input
                 id="declared_value"
                 type="number"
@@ -402,7 +402,7 @@ export default function InventoryFormDialog({ open, onOpenChange, item, onSucces
               />
             </div>
             <div>
-              <Label htmlFor="storage_rate">Storage Rate (PKR/month)</Label>
+              <Label htmlFor="storage_rate">Storage Rate (USD/month)</Label>
               <Input
                 id="storage_rate"
                 type="number"

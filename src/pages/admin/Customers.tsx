@@ -7,6 +7,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Search, Users, Plus, Pencil, Trash2, Eye } from "lucide-react";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { toast } from "sonner";
+import Spinner from "@/components/Spinner";
+import { formatCurrency } from "@/lib/currency";
 import { useNavigate } from "react-router-dom";
 import {
   AlertDialog,
@@ -42,7 +44,9 @@ export default function AdminCustomers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>();
+  const [selectedCustomer, setSelectedCustomer] = useState<
+    Customer | undefined
+  >();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -54,9 +58,9 @@ export default function AdminCustomers() {
   const fetchCustomers = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from("customers")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (!error && data) {
       setCustomers(data);
@@ -64,11 +68,14 @@ export default function AdminCustomers() {
     setLoading(false);
   };
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.customer_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCustomers = customers.filter(
+    (customer) =>
+      customer.customer_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.contact_person
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleEdit = (customer: Customer) => {
@@ -93,8 +100,12 @@ export default function AdminCustomers() {
       if (error) throw error;
       toast.success("Customer deleted successfully");
       fetchCustomers();
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      const message =
+        typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Failed to delete customer";
+      toast.error(message);
     } finally {
       setDeleteDialogOpen(false);
       setCustomerToDelete(null);
@@ -132,48 +143,89 @@ export default function AdminCustomers() {
               placeholder="Search customers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 focus:border-none"
             />
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading...</div>
+            <div className="flex items-center justify-center py-12">
+              <Spinner label="Loading customers" />
+            </div>
           ) : filteredCustomers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No customers found</div>
+            <div className="text-center py-8 text-muted-foreground">
+              No customers found
+            </div>
           ) : (
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
                 {filteredCustomers.map((customer) => (
-                  <div key={customer.id} className="border border-border rounded-lg bg-card p-4">
+                  <div
+                    key={customer.id}
+                    className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
+                  >
                     <div className="flex items-center justify-between">
-                      <div className="font-semibold">{customer.customer_code} — {customer.company_name}</div>
+                      <div className="font-semibold">
+                        {customer.customer_code} — {customer.company_name}
+                      </div>
                       <StatusBadge status={customer.status} />
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-muted-foreground">Contact</div>
-                      <div className="text-right">{customer.contact_person}</div>
-                      <div className="text-muted-foreground">Email</div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm">
+                      <div className="text-muted-foreground text-xs">
+                        Contact
+                      </div>
+                      <div className="text-right">
+                        {customer.contact_person}
+                      </div>
+                      <div className="text-muted-foreground text-xs">Email</div>
                       <div className="text-right">{customer.email}</div>
-                      <div className="text-muted-foreground">Phone</div>
+                      <div className="text-muted-foreground text-xs">Phone</div>
                       <div className="text-right">{customer.phone}</div>
-                      <div className="text-muted-foreground">Type</div>
-                      <div className="text-right capitalize">{customer.customer_type}</div>
-                      <div className="text-muted-foreground">Address</div>
-                      <div className="text-right">{customer.address_line1 || '-'}</div>
-                      <div className="text-muted-foreground">Location</div>
-                      <div className="text-right">{customer.city}, {customer.country}</div>
-                      <div className="text-muted-foreground">Credit Limit</div>
-                      <div className="text-right">{typeof customer.credit_limit === 'number' ? `PKR ${customer.credit_limit.toFixed(2)}` : '-'}</div>
-                      <div className="text-muted-foreground">Payment</div>
-                      <div className="text-right">{customer.payment_terms || '-'}</div>
+                      <div className="text-muted-foreground text-xs">Type</div>
+                      <div className="text-right capitalize">
+                        {customer.customer_type}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Address
+                      </div>
+                      <div className="text-right">
+                        {customer.address_line1 || "-"}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Location
+                      </div>
+                      <div className="text-right">
+                        {customer.city}, {customer.country}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Credit Limit
+                      </div>
+                      <div className="text-right">
+                        {typeof customer.credit_limit === "number"
+                          ? formatCurrency(customer.credit_limit)
+                          : "-"}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Payment
+                      </div>
+                      <div className="text-right">
+                        {customer.payment_terms || "-"}
+                      </div>
                     </div>
                     <div className="mt-3 flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleViewInventory(customer.id)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleViewInventory(customer.id)}
+                      >
                         <Eye className="h-4 w-4 mr-1" /> Inventory
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(customer)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit(customer)}
+                      >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
@@ -216,25 +268,61 @@ export default function AdminCustomers() {
                     <tbody>
                       {filteredCustomers.map((customer) => (
                         <tr key={customer.id}>
-                          <td className="font-medium whitespace-nowrap">{customer.customer_code}</td>
-                          <td className="whitespace-nowrap">{customer.company_name}</td>
-                          <td className="whitespace-nowrap">{customer.contact_person}</td>
-                          <td className="whitespace-nowrap">{customer.email}</td>
-                          <td className="whitespace-nowrap">{customer.phone}</td>
-                          <td className="capitalize whitespace-nowrap">{customer.customer_type}</td>
-                          <td className="whitespace-nowrap">{customer.address_line1 || '-'}</td>
-                          <td className="whitespace-nowrap">{customer.city}, {customer.country}</td>
-                          <td><StatusBadge status={customer.status} /></td>
-                          <td className="whitespace-nowrap">{typeof customer.credit_limit === 'number' ? `PKR ${customer.credit_limit.toFixed(2)}` : '-'}</td>
-                          <td className="whitespace-nowrap">{customer.payment_terms || '-'}</td>
-                          <td className="whitespace-nowrap">{customer.tax_id || '-'}</td>
-                          <td className="whitespace-nowrap">{new Date(customer.created_at).toLocaleDateString()}</td>
+                          <td className="font-medium whitespace-nowrap">
+                            {customer.customer_code}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {customer.company_name}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {customer.contact_person}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {customer.email}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {customer.phone}
+                          </td>
+                          <td className="capitalize whitespace-nowrap">
+                            {customer.customer_type}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {customer.address_line1 || "-"}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {customer.city}, {customer.country}
+                          </td>
+                          <td>
+                            <StatusBadge status={customer.status} />
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {typeof customer.credit_limit === "number"
+                              ? formatCurrency(customer.credit_limit)
+                              : "-"}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {customer.payment_terms || "-"}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {customer.tax_id || "-"}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {new Date(customer.created_at).toLocaleDateString()}
+                          </td>
                           <td>
                             <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleViewInventory(customer.id)}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewInventory(customer.id)}
+                              >
                                 <Eye className="h-4 w-4 mr-1" /> Inventory
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleEdit(customer)}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEdit(customer)}
+                              >
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
@@ -272,7 +360,8 @@ export default function AdminCustomers() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this customer and all associated data. This action cannot be undone.
+              This will permanently delete this customer and all associated
+              data. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

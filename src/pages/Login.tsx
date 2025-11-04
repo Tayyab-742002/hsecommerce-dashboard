@@ -65,7 +65,7 @@ export default function Login() {
               <Package className="h-10 w-10 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Depot Buddy</CardTitle>
+          <CardTitle className="text-2xl font-bold">HSEcommerce</CardTitle>
           <CardDescription>
             3PL Warehouse Management System
           </CardDescription>

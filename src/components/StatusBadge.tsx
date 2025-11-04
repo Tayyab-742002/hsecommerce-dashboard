@@ -8,23 +8,19 @@ interface StatusBadgeProps {
 export const StatusBadge = ({ status, className }: StatusBadgeProps) => {
   const getStatusClass = (status: string) => {
     const lowerStatus = status.toLowerCase();
-    
-    if (lowerStatus.includes('pending') || lowerStatus.includes('draft')) {
-      return 'status-pending';
-    }
-    if (lowerStatus.includes('approved') || lowerStatus.includes('completed') || 
-        lowerStatus.includes('delivered') || lowerStatus.includes('active')) {
-      return 'status-approved';
-    }
-    if (lowerStatus.includes('progress') || lowerStatus.includes('picking') || 
-        lowerStatus.includes('packed') || lowerStatus.includes('transit')) {
-      return 'status-in-progress';
-    }
-    if (lowerStatus.includes('cancelled') || lowerStatus.includes('inactive') || 
-        lowerStatus.includes('suspended')) {
-      return 'status-cancelled';
-    }
-    
+
+    // Exact pills for requested statuses
+    if (lowerStatus.includes('pending')) return 'status-pending';
+    if (lowerStatus.includes('processing') || lowerStatus.includes('in_process')) return 'status-processing';
+    if (lowerStatus.includes('ready')) return 'status-ready';
+    if (lowerStatus.includes('in transit') || lowerStatus.includes('in_transit') || lowerStatus.includes('transit')) return 'status-in-transit';
+    if (lowerStatus.includes('completed') || lowerStatus.includes('delivered')) return 'status-completed';
+    if (lowerStatus.includes('cancelled')) return 'status-cancelled';
+
+    // Fallbacks to previous generic styles
+    if (lowerStatus.includes('approved') || lowerStatus.includes('active')) return 'status-approved';
+    if (lowerStatus.includes('progress') || lowerStatus.includes('picking') || lowerStatus.includes('packed')) return 'status-in-progress';
+
     return 'status-pending';
   };
 

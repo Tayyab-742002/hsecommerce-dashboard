@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
+import Spinner from "@/components/Spinner";
+import { formatCurrency } from "@/lib/currency";
 import { Search } from "lucide-react";
 
 interface Order {
@@ -35,25 +37,29 @@ export default function CustomerOrders() {
   }, []);
 
   const fetchOrders = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('customer_id')
-      .eq('user_id', user.id)
+      .from("user_roles")
+      .select("customer_id")
+      .eq("user_id", user.id)
       .single();
 
     if (!userRole?.customer_id) return;
 
     const { data, error } = await supabase
-      .from('outbound_orders')
-      .select(`
+      .from("outbound_orders")
+      .select(
+        `
         *,
         warehouses (warehouse_name)
-      `)
-      .eq('customer_id', userRole.customer_id)
-      .order('created_at', { ascending: false });
+      `
+      )
+      .eq("customer_id", userRole.customer_id)
+      .order("created_at", { ascending: false });
 
     if (!error && data) {
       setOrders(data as Order[]);
@@ -61,7 +67,7 @@ export default function CustomerOrders() {
     setLoading(false);
   };
 
-  const filteredOrders = orders.filter(order =>
+  const filteredOrders = orders.filter((order) =>
     order.order_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -81,13 +87,15 @@ export default function CustomerOrders() {
               placeholder="Search orders..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 focus:border-none"
             />
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading...</div>
+            <div className="flex items-center justify-center py-12">
+              <Spinner label="Loading orders" />
+            </div>
           ) : filteredOrders.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No orders found
@@ -97,24 +105,47 @@ export default function CustomerOrders() {
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
                 {filteredOrders.map((order) => (
-                  <div key={order.id} className="border border-border rounded-lg bg-card p-4">
+                  <div
+                    key={order.id}
+                    className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="font-semibold">{order.order_number}</div>
                       <StatusBadge status={order.status} />
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-muted-foreground">Warehouse</div>
-                      <div className="text-right">{order.warehouses?.warehouse_name}</div>
-                      <div className="text-muted-foreground">Type</div>
-                      <div className="text-right capitalize">{order.order_type}</div>
-                      <div className="text-muted-foreground">Priority</div>
-                      <div className="text-right capitalize">{order.priority || '-'}</div>
-                      <div className="text-muted-foreground">Items</div>
-                      <div className="text-right">{order.total_items} ({order.total_quantity})</div>
-                      <div className="text-muted-foreground">Requested</div>
-                      <div className="text-right">{new Date(order.requested_date).toLocaleDateString()}</div>
-                      <div className="text-muted-foreground">Charges</div>
-                      <div className="text-right font-medium">PKR {order.total_charges?.toFixed(2)}</div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm">
+                      <div className="text-muted-foreground text-xs">
+                        Warehouse
+                      </div>
+                      <div className="text-right">
+                        {order.warehouses?.warehouse_name}
+                      </div>
+                      <div className="text-muted-foreground text-xs">Type</div>
+                      <div className="text-right capitalize">
+                        {order.order_type}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Priority
+                      </div>
+                      <div className="text-right capitalize">
+                        {order.priority || "-"}
+                      </div>
+                      <div className="text-muted-foreground text-xs">Items</div>
+                      <div className="text-right">
+                        {order.total_items} ({order.total_quantity})
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Requested
+                      </div>
+                      <div className="text-right">
+                        {new Date(order.requested_date).toLocaleDateString()}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Charges
+                      </div>
+                      <div className="text-right font-medium">
+                        {formatCurrency(order.total_charges ?? 0)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -143,18 +174,55 @@ export default function CustomerOrders() {
                     <tbody>
                       {filteredOrders.map((order) => (
                         <tr key={order.id}>
-                          <td className="font-medium whitespace-nowrap">{order.order_number}</td>
-                          <td className="whitespace-nowrap">{order.warehouses?.warehouse_name}</td>
-                          <td className="capitalize whitespace-nowrap">{order.order_type}</td>
-                          <td className="capitalize whitespace-nowrap">{order.priority || '-'}</td>
-                          <td><StatusBadge status={order.status} /></td>
-                          <td className="whitespace-nowrap">{order.total_items} ({order.total_quantity} units)</td>
-                          <td className="whitespace-nowrap">{new Date(order.requested_date).toLocaleDateString()}</td>
-                          <td className="whitespace-nowrap">{order.scheduled_date ? new Date(order.scheduled_date).toLocaleDateString() : '-'}</td>
-                          <td className="whitespace-nowrap">{order.completed_date ? new Date(order.completed_date).toLocaleDateString() : '-'}</td>
-                          <td className="font-medium whitespace-nowrap">PKR {order.total_charges?.toFixed(2)}</td>
-                          <td className="whitespace-nowrap">{order.delivery_contact_name || '-'}{order.delivery_contact_phone ? ` (${order.delivery_contact_phone})` : ''}</td>
-                          <td className="whitespace-nowrap">{order.delivery_city || '-'}</td>
+                          <td className="font-medium whitespace-nowrap">
+                            {order.order_number}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {order.warehouses?.warehouse_name}
+                          </td>
+                          <td className="capitalize whitespace-nowrap">
+                            {order.order_type}
+                          </td>
+                          <td className="capitalize whitespace-nowrap">
+                            {order.priority || "-"}
+                          </td>
+                          <td>
+                            <StatusBadge status={order.status} />
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {order.total_items} ({order.total_quantity} units)
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {new Date(
+                              order.requested_date
+                            ).toLocaleDateString()}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {order.scheduled_date
+                              ? new Date(
+                                  order.scheduled_date
+                                ).toLocaleDateString()
+                              : "-"}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {order.completed_date
+                              ? new Date(
+                                  order.completed_date
+                                ).toLocaleDateString()
+                              : "-"}
+                          </td>
+                          <td className="font-medium whitespace-nowrap">
+                            {formatCurrency(order.total_charges ?? 0)}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {order.delivery_contact_name || "-"}
+                            {order.delivery_contact_phone
+                              ? ` (${order.delivery_contact_phone})`
+                              : ""}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {order.delivery_city || "-"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
 
 interface OrderWizardProps {
   onComplete: () => void;
@@ -386,7 +387,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           <CardContent className="pt-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Handling Charges (PKR)</Label>
+                <Label>Handling Charges (USD)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -395,7 +396,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Delivery Charges (PKR)</Label>
+                <Label>Delivery Charges (USD)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -427,7 +428,12 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
                   <span>Total Charges:</span>
-                  <span>PKR {(Number(orderData.handling_charges) + Number(orderData.delivery_charges)).toFixed(2)}</span>
+                  <span>
+                    {formatCurrency(
+                      Number(orderData.handling_charges) +
+                        Number(orderData.delivery_charges)
+                    )}
+                  </span>
                 </div>
               </div>
             </div>

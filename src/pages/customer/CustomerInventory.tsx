@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
+import Spinner from "@/components/Spinner";
 import { Search } from "lucide-react";
 
 interface InventoryItem {
@@ -36,25 +37,29 @@ export default function CustomerInventory() {
   }, []);
 
   const fetchInventory = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('customer_id')
-      .eq('user_id', user.id)
+      .from("user_roles")
+      .select("customer_id")
+      .eq("user_id", user.id)
       .single();
 
     if (!userRole?.customer_id) return;
 
     const { data, error } = await supabase
-      .from('inventory_items')
-      .select(`
+      .from("inventory_items")
+      .select(
+        `
         *,
         warehouses (warehouse_name)
-      `)
-      .eq('customer_id', userRole.customer_id)
-      .order('received_date', { ascending: false });
+      `
+      )
+      .eq("customer_id", userRole.customer_id)
+      .order("received_date", { ascending: false });
 
     if (!error && data) {
       setItems(data as InventoryItem[]);
@@ -62,9 +67,10 @@ export default function CustomerInventory() {
     setLoading(false);
   };
 
-  const filteredItems = items.filter(item =>
-    item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.item_name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredItems = items.filter(
+    (item) =>
+      item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.item_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -83,13 +89,15 @@ export default function CustomerInventory() {
               placeholder="Search items..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 focus:border-none"
             />
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading...</div>
+            <div className="flex items-center justify-center py-12">
+              <Spinner label="Loading inventory" />
+            </div>
           ) : filteredItems.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No inventory items found
@@ -99,26 +107,59 @@ export default function CustomerInventory() {
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
                 {filteredItems.map((item) => (
-                  <div key={item.id} className="border border-border rounded-lg bg-card p-4">
+                  <div
+                    key={item.id}
+                    className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
+                  >
                     <div className="flex items-center justify-between">
-                      <div className="font-semibold">{item.item_code} — {item.item_name}</div>
+                      <div className="font-semibold">
+                        {item.item_code} — {item.item_name}
+                      </div>
                       <StatusBadge status={item.status} />
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-muted-foreground">Warehouse</div>
-                      <div className="text-right">{item.warehouses?.warehouse_name}</div>
-                      <div className="text-muted-foreground">SKU</div>
-                      <div className="text-right">{item.sku || '-'}</div>
-                      <div className="text-muted-foreground">Category</div>
-                      <div className="text-right capitalize">{item.category || '-'}</div>
-                      <div className="text-muted-foreground">Qty</div>
-                      <div className="text-right">{item.quantity} {item.unit_of_measure || 'pcs'}</div>
-                      <div className="text-muted-foreground">Weight</div>
-                      <div className="text-right">{item.weight ? `${item.weight} ${item.weight_unit || 'kg'}` : '-'}</div>
-                      <div className="text-muted-foreground">Size</div>
-                      <div className="text-right">{item.dimension_length && item.dimension_width && item.dimension_height ? `${item.dimension_length}×${item.dimension_width}×${item.dimension_height} ${item.dimension_unit || 'cm'}` : '-'}</div>
-                      <div className="text-muted-foreground">Received</div>
-                      <div className="text-right">{new Date(item.received_date).toLocaleDateString()}</div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm">
+                      <div className="text-muted-foreground text-xs">
+                        Warehouse
+                      </div>
+                      <div className="text-right">
+                        {item.warehouses?.warehouse_name}
+                      </div>
+                      <div className="text-muted-foreground text-xs">SKU</div>
+                      <div className="text-right">{item.sku || "-"}</div>
+                      <div className="text-muted-foreground text-xs">
+                        Category
+                      </div>
+                      <div className="text-right capitalize">
+                        {item.category || "-"}
+                      </div>
+                      <div className="text-muted-foreground text-xs">Qty</div>
+                      <div className="text-right">
+                        {item.quantity} {item.unit_of_measure || "pcs"}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Weight
+                      </div>
+                      <div className="text-right">
+                        {item.weight
+                          ? `${item.weight} ${item.weight_unit || "kg"}`
+                          : "-"}
+                      </div>
+                      <div className="text-muted-foreground text-xs">Size</div>
+                      <div className="text-right">
+                        {item.dimension_length &&
+                        item.dimension_width &&
+                        item.dimension_height
+                          ? `${item.dimension_length}×${item.dimension_width}×${
+                              item.dimension_height
+                            } ${item.dimension_unit || "cm"}`
+                          : "-"}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Received
+                      </div>
+                      <div className="text-right">
+                        {new Date(item.received_date).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -146,17 +187,47 @@ export default function CustomerInventory() {
                     <tbody>
                       {filteredItems.map((item) => (
                         <tr key={item.id}>
-                          <td className="font-medium whitespace-nowrap">{item.item_code}</td>
-                          <td className="whitespace-nowrap">{item.item_name}</td>
-                          <td className="whitespace-nowrap">{item.sku || '-'}</td>
-                          <td className="capitalize whitespace-nowrap">{item.category || '-'}</td>
-                          <td className="whitespace-nowrap">{item.warehouses?.warehouse_name}</td>
+                          <td className="font-medium whitespace-nowrap">
+                            {item.item_code}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {item.item_name}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {item.sku || "-"}
+                          </td>
+                          <td className="capitalize whitespace-nowrap">
+                            {item.category || "-"}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {item.warehouses?.warehouse_name}
+                          </td>
                           <td className="whitespace-nowrap">{item.quantity}</td>
-                          <td className="whitespace-nowrap">{item.unit_of_measure || 'pcs'}</td>
-                          <td className="whitespace-nowrap">{item.weight ? `${item.weight} ${item.weight_unit || 'kg'}` : '-'}</td>
-                          <td className="whitespace-nowrap">{item.dimension_length && item.dimension_width && item.dimension_height ? `${item.dimension_length}×${item.dimension_width}×${item.dimension_height} ${item.dimension_unit || 'cm'}` : '-'}</td>
-                          <td><StatusBadge status={item.status} /></td>
-                          <td className="whitespace-nowrap">{new Date(item.received_date).toLocaleDateString()}</td>
+                          <td className="whitespace-nowrap">
+                            {item.unit_of_measure || "pcs"}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {item.weight
+                              ? `${item.weight} ${item.weight_unit || "kg"}`
+                              : "-"}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {item.dimension_length &&
+                            item.dimension_width &&
+                            item.dimension_height
+                              ? `${item.dimension_length}×${
+                                  item.dimension_width
+                                }×${item.dimension_height} ${
+                                  item.dimension_unit || "cm"
+                                }`
+                              : "-"}
+                          </td>
+                          <td>
+                            <StatusBadge status={item.status} />
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {new Date(item.received_date).toLocaleDateString()}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
