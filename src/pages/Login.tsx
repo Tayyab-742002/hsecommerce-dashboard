@@ -70,9 +70,9 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
+            <img src="/logo.png" alt="H&S E-commerce" width={50} height={50} />
           </div>
-          <CardTitle className="text-2xl font-bold">HSEcommerce</CardTitle>
+          <CardTitle className="text-2xl font-bold">H&S E-commerce</CardTitle>
           <CardDescription>3PL Warehouse Management System</CardDescription>
         </CardHeader>
         <CardContent>

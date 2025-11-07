@@ -33,7 +33,6 @@ interface Order {
   order_number: string;
   status: string;
   order_type: string;
-  priority: string;
   requested_date: string;
   scheduled_date: string | null;
   completed_date: string | null;
@@ -50,6 +49,10 @@ interface Order {
   warehouses: {
     warehouse_name: string;
   };
+  outbound_order_items?: Array<{
+    order_item: string;
+    quantity: number;
+  }>;
 }
 
 export default function AdminOrders() {
@@ -77,13 +80,14 @@ export default function AdminOrders() {
         `
         *,
         customers (company_name, contact_person),
-        warehouses (warehouse_name)
+        warehouses (warehouse_name),
+        outbound_order_items (order_item, quantity)
       `
       )
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setOrders(data as Order[]);
+      setOrders(data as unknown as Order[]);
     }
     setLoading(false);
   };
@@ -192,7 +196,10 @@ export default function AdminOrders() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-semibold whitespace-nowrap">
-                        {order.order_number}
+                        {order.outbound_order_items
+                          ?.map((item) => item.order_item)
+                          .filter(Boolean)
+                          .join(", ") || "-"}
                       </div>
                       <StatusBadge status={order.status} />
                     </div>
@@ -214,18 +221,21 @@ export default function AdminOrders() {
                       <div className="text-right capitalize">
                         {order.order_type}
                       </div>
-                      <div className="text-muted-foreground text-xs">
-                        Priority
-                      </div>
-                      <div className="text-right capitalize">
-                        {order.priority}
-                      </div>
                       <div className="text-muted-foreground text-xs">Items</div>
                       <div className="text-right">
                         {order.total_items} ({order.total_quantity})
                       </div>
+                      {/* <div className="text-muted-foreground text-xs">
+                        Item Names
+                      </div>
+                      <div className="text-right text-xs">
+                        {order.outbound_order_items
+                          ?.map((item) => item.order_item)
+                          .filter(Boolean)
+                          .join(", ") || "-"}
+                      </div> */}
                       <div className="text-muted-foreground text-xs">
-                        Requested
+                        Dispatched
                       </div>
                       <div className="text-right">
                         {new Date(order.requested_date).toLocaleDateString()}
@@ -269,7 +279,7 @@ export default function AdminOrders() {
                     <thead>
                       <tr className="border-b border-border text-xs uppercase text-muted-foreground">
                         <th className="px-3 py-3 text-left font-medium">
-                          Order Number
+                          Item Names
                         </th>
                         <th className="px-3 py-3 text-left font-medium">
                           Customer
@@ -281,32 +291,32 @@ export default function AdminOrders() {
                           Type
                         </th>
                         <th className="px-3 py-3 text-left font-medium">
-                          Priority
-                        </th>
-                        <th className="px-3 py-3 text-left font-medium">
                           Status
                         </th>
                         <th className="px-3 py-3 text-left font-medium">
-                          Items
+                          Items (Count)
                         </th>
+                        {/* <th className="px-3 py-3 text-left font-medium">
+                          Item Names
+                        </th> */}
                         <th className="px-3 py-3 text-left font-medium">
-                          Requested Date
+                          Dispatched
                         </th>
-                        <th className="px-3 py-3 text-left font-medium">
+                        {/* <th className="px-3 py-3 text-left font-medium">
                           Scheduled
-                        </th>
+                        </th> */}
                         <th className="px-3 py-3 text-left font-medium">
                           Completed
                         </th>
                         <th className="px-3 py-3 text-left font-medium">
                           Charges
                         </th>
-                        <th className="px-3 py-3 text-left font-medium">
+                        {/* <th className="px-3 py-3 text-left font-medium">
                           Contact
-                        </th>
-                        <th className="px-3 py-3 text-left font-medium">
+                        </th> */}
+                        {/* <th className="px-3 py-3 text-left font-medium">
                           City
-                        </th>
+                        </th> */}
                         <th className="px-3 py-3 text-left font-medium">
                           Actions
                         </th>
@@ -319,7 +329,10 @@ export default function AdminOrders() {
                           className="border-b border-border/60 last:border-b-0"
                         >
                           <td className="px-3 py-3 font-medium whitespace-nowrap">
-                            {order.order_number}
+                            {order.outbound_order_items
+                              ?.map((item) => item.order_item)
+                              .filter(Boolean)
+                              .join(", ") || "-"}
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap">
                             {order.customers?.company_name ||
@@ -331,27 +344,30 @@ export default function AdminOrders() {
                           <td className="px-3 py-3 capitalize whitespace-nowrap">
                             {order.order_type}
                           </td>
-                          <td className="px-3 py-3 capitalize whitespace-nowrap">
-                            {order.priority}
-                          </td>
                           <td className="px-3 py-3">
                             <StatusBadge status={order.status} />
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap">
                             {order.total_items} ({order.total_quantity} units)
                           </td>
+                          {/* <td className="px-3 py-3 text-sm max-w-xs truncate">
+                            {order.outbound_order_items
+                              ?.map((item) => item.order_item)
+                              .filter(Boolean)
+                              .join(", ") || "-"}
+                          </td> */}
                           <td className="px-3 py-3 whitespace-nowrap">
                             {new Date(
                               order.requested_date
                             ).toLocaleDateString()}
                           </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
+                          {/* <td className="px-3 py-3 whitespace-nowrap">
                             {order.scheduled_date
                               ? new Date(
                                   order.scheduled_date
                                 ).toLocaleDateString()
                               : "-"}
-                          </td>
+                          </td> */}
                           <td className="px-3 py-3 whitespace-nowrap">
                             {order.completed_date
                               ? new Date(
@@ -362,15 +378,15 @@ export default function AdminOrders() {
                           <td className="px-3 py-3 font-medium whitespace-nowrap">
                             {formatCurrency(order.total_charges ?? 0)}
                           </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
+                          {/* <td className="px-3 py-3 whitespace-nowrap">
                             {order.delivery_contact_name || "-"}
                             {order.delivery_contact_phone
                               ? ` (${order.delivery_contact_phone})`
                               : ""}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
+                          </td> */}
+                          {/* <td className="px-3 py-3 whitespace-nowrap">
                             {order.delivery_city || "-"}
-                          </td>
+                          </td> */}
                           <td className="px-3 py-3">
                             <div className="flex gap-2">
                               <Button

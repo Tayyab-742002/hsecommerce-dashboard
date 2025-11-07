@@ -61,10 +61,10 @@ export default function AdminLayout() {
       <aside className="hidden md:flex md:w-64 bg-sidebar border-r border-sidebar-border flex-col shadow-lg">
         <div className="p-5 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
+            <img src="/logo.png" alt="H&S E-commerce" width={50} height={50} />
             <div>
               <h1 className="text-base font-bold text-sidebar-foreground tracking-tight">
-                HSEcommerce
+                H&S E-commerce
               </h1>
               <p className="text-xs text-sidebar-foreground/60 mt-0.5">
                 Admin Portal
@@ -129,10 +129,10 @@ export default function AdminLayout() {
         >
           <div className="p-5 border-b border-sidebar-border">
             <div className="flex items-center gap-3">
-              <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
+              <img src="/logo.png" alt="H&S E-commerce" width={50} height={50} />
               <div>
                 <h1 className="text-base font-bold text-sidebar-foreground tracking-tight">
-                  HSEcommerce
+                  H&S E-commerce
                 </h1>
                 <p className="text-xs text-sidebar-foreground/60 mt-0.5">
                   Admin Portal
@@ -191,9 +191,9 @@ export default function AdminLayout() {
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
+            <img src="/logo.png" alt="H&S E-commerce" width={50} height={50} />
             <span className="font-semibold text-sm tracking-tight">
-              HSEcommerce
+              H&S E-commerce
             </span>
           </div>
           <div className="w-12" />

@@ -41,7 +41,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
     order_type: "delivery",
     requested_date: new Date().toISOString().split("T")[0],
     special_instructions: "",
-    handling_charges: 0,
+    pick_and_pack_rate: 0, // Charge per quantity
     delivery_charges: 0,
   });
 
@@ -144,8 +144,8 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       (sum, item) => sum + item.quantity,
       0
     );
-    const totalCharges =
-      Number(orderData.handling_charges) + Number(orderData.delivery_charges);
+    // Calculate total charges: rate per quantity × total quantity
+    const totalCharges = Number(orderData.pick_and_pack_rate) * totalQuantity;
 
     // Generate order number
     const orderNumber = `OUT-${new Date().getFullYear()}-${String(
@@ -155,7 +155,13 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
     const { data: order, error: orderError } = await supabase
       .from("outbound_orders")
       .insert({
-        ...orderData,
+        customer_id: orderData.customer_id,
+        warehouse_id: orderData.warehouse_id,
+        order_type: orderData.order_type,
+        requested_date: orderData.requested_date,
+        special_instructions: orderData.special_instructions || null,
+        handling_charges: totalCharges, // Store calculated total charges
+        delivery_charges: 0, // Keep for database compatibility
         order_number: orderNumber,
         total_items: orderItems.length,
         total_quantity: totalQuantity,
@@ -182,6 +188,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           outbound_order_id: order.id,
           inventory_item_id: item.inventory_item_id,
           quantity: item.quantity,
+          order_item: item.item_name, // Store item_name at time of order creation
         }))
       );
 
@@ -395,31 +402,33 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           <CardContent className="pt-6 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Handling Charges (GBP)</Label>
+                <Label>Pick and Pack Charge per Quantity (GBP)</Label>
                 <Input
                   type="number"
                   step="0.01"
-                  value={orderData.handling_charges}
+                  min="0"
+                  value={orderData.pick_and_pack_rate}
                   onChange={(e) =>
                     setOrderData({
                       ...orderData,
-                      handling_charges: parseFloat(e.target.value) || 0,
+                      pick_and_pack_rate: parseFloat(e.target.value) || 0,
                     })
                   }
                 />
+                <p className="text-sm text-muted-foreground">
+                  Charge per unit of quantity (e.g., 0.15 per item)
+                </p>
               </div>
               <div className="space-y-2">
-                <Label>Delivery Charges (GBP)</Label>
+                <Label>Total Quantity</Label>
                 <Input
                   type="number"
-                  step="0.01"
-                  value={orderData.delivery_charges}
-                  onChange={(e) =>
-                    setOrderData({
-                      ...orderData,
-                      delivery_charges: parseFloat(e.target.value) || 0,
-                    })
-                  }
+                  value={orderItems.reduce(
+                    (sum, item) => sum + item.quantity,
+                    0
+                  )}
+                  disabled
+                  className="bg-muted"
                 />
               </div>
             </div>
@@ -451,12 +460,18 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                     {orderItems.reduce((sum, item) => sum + item.quantity, 0)}
                   </span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Pick and Pack Rate:</span>
+                  <span className="font-medium">
+                    {formatCurrency(orderData.pick_and_pack_rate)} per quantity
+                  </span>
+                </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
                   <span>Total Charges:</span>
                   <span>
                     {formatCurrency(
-                      Number(orderData.handling_charges) +
-                        Number(orderData.delivery_charges)
+                      orderData.pick_and_pack_rate *
+                        orderItems.reduce((sum, item) => sum + item.quantity, 0)
                     )}
                   </span>
                 </div>

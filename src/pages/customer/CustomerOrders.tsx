@@ -25,6 +25,10 @@ interface Order {
   warehouses: {
     warehouse_name: string;
   };
+  outbound_order_items?: Array<{
+    order_item: string;
+    quantity: number;
+  }>;
 }
 
 export default function CustomerOrders() {
@@ -55,14 +59,15 @@ export default function CustomerOrders() {
       .select(
         `
         *,
-        warehouses (warehouse_name)
+        warehouses (warehouse_name),
+        outbound_order_items (order_item, quantity)
       `
       )
       .eq("customer_id", userRole.customer_id)
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setOrders(data as Order[]);
+      setOrders(data as unknown as Order[]);
     }
     setLoading(false);
   };
@@ -115,6 +120,15 @@ export default function CustomerOrders() {
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm">
                       <div className="text-muted-foreground text-xs">
+                        Item Names
+                      </div>
+                      <div className="text-right">
+                        {order.outbound_order_items
+                          ?.map((item) => item.order_item)
+                          .filter(Boolean)
+                          .join(", ") || "-"}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
                         Warehouse
                       </div>
                       <div className="text-right">
@@ -124,12 +138,12 @@ export default function CustomerOrders() {
                       <div className="text-right capitalize">
                         {order.order_type}
                       </div>
-                      <div className="text-muted-foreground text-xs">
+                      {/* <div className="text-muted-foreground text-xs">
                         Priority
                       </div>
                       <div className="text-right capitalize">
                         {order.priority || "-"}
-                      </div>
+                      </div> */}
                       <div className="text-muted-foreground text-xs">Items</div>
                       <div className="text-right">
                         {order.total_items} ({order.total_quantity})
@@ -158,17 +172,18 @@ export default function CustomerOrders() {
                     <thead>
                       <tr>
                         <th>Order Number</th>
+                        <th>Item Names</th>
                         <th>Warehouse</th>
                         <th>Type</th>
-                        <th>Priority</th>
+                        {/* <th>Priority</th> */}
                         <th>Status</th>
                         <th>Items</th>
-                        <th>Requested Date</th>
-                        <th>Scheduled</th>
+                        <th>Dispatched</th>
+                        {/* <th>Scheduled</th> */}
                         <th>Completed</th>
                         <th>Charges</th>
-                        <th>Contact</th>
-                        <th>City</th>
+                        {/* <th>Contact</th> */}
+                        {/* <th>City</th> */}
                       </tr>
                     </thead>
                     <tbody>
@@ -178,14 +193,20 @@ export default function CustomerOrders() {
                             {order.order_number}
                           </td>
                           <td className="whitespace-nowrap">
+                            {order.outbound_order_items
+                              ?.map((item) => item.order_item)
+                              .filter(Boolean)
+                              .join(", ") || "-"}
+                          </td>
+                          <td className="whitespace-nowrap">
                             {order.warehouses?.warehouse_name}
                           </td>
                           <td className="capitalize whitespace-nowrap">
                             {order.order_type}
                           </td>
-                          <td className="capitalize whitespace-nowrap">
+                          {/* <td className="capitalize whitespace-nowrap">
                             {order.priority || "-"}
-                          </td>
+                          </td> */}
                           <td>
                             <StatusBadge status={order.status} />
                           </td>
@@ -197,13 +218,13 @@ export default function CustomerOrders() {
                               order.requested_date
                             ).toLocaleDateString()}
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {order.scheduled_date
                               ? new Date(
                                   order.scheduled_date
                                 ).toLocaleDateString()
                               : "-"}
-                          </td>
+                          </td> */}
                           <td className="whitespace-nowrap">
                             {order.completed_date
                               ? new Date(
@@ -214,15 +235,15 @@ export default function CustomerOrders() {
                           <td className="font-medium whitespace-nowrap">
                             {formatCurrency(order.total_charges ?? 0)}
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {order.delivery_contact_name || "-"}
                             {order.delivery_contact_phone
                               ? ` (${order.delivery_contact_phone})`
                               : ""}
-                          </td>
-                          <td className="whitespace-nowrap">
+                          </td>  */}
+                          {/* <td className="whitespace-nowrap">
                             {order.delivery_city || "-"}
-                          </td>
+                          </td> */}
                         </tr>
                       ))}
                     </tbody>

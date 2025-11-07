@@ -116,7 +116,7 @@ export default function AdminDashboard() {
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Welcome to HSEcommerce Admin Portal
+            Welcome to H&S E-commerce Admin Portal
           </p>
         </div>
         <Button
@@ -145,11 +145,11 @@ export default function AdminDashboard() {
           value={stats.totalCustomers}
           icon={Users}
         />
-        <KPICard
+        {/* <KPICard
           title="Pending Orders"
           value={stats.pendingOrders}
           icon={TrendingUp}
-        />
+        /> */}
         <KPICard
           title="Warehouse Capacity"
           value={`${stats.warehouseCapacity.toLocaleString()} sqft`}

@@ -136,14 +136,14 @@ export default function CustomerInventory() {
                       <div className="text-right">
                         {item.quantity} {item.unit_of_measure || "pcs"}
                       </div>
-                      <div className="text-muted-foreground text-xs">
+                      {/* <div className="text-muted-foreground text-xs">
                         Weight
                       </div>
                       <div className="text-right">
                         {item.weight
                           ? `${item.weight} ${item.weight_unit || "kg"}`
                           : "-"}
-                      </div>
+                      </div> */}
                       {/* <div className="text-muted-foreground text-xs">Size</div>
                       <div className="text-right">
                         {item.dimension_length &&
@@ -178,7 +178,7 @@ export default function CustomerInventory() {
                         {/* <th>Warehouse</th> */}
                         <th>Quantity</th>
                         {/* <th>UoM</th> */}
-                        <th>Weight</th>
+                        {/* <th>Weight</th> */}
                         {/* <th>Dimensions</th> */}
                         <th>Status</th>
                         <th>Received Date</th>
@@ -206,12 +206,12 @@ export default function CustomerInventory() {
                           {/* <td className="whitespace-nowrap">
                             {item.unit_of_measure || "pcs"}
                           </td> */}
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {item.weight
                               ? `${item.weight} ${item.weight_unit || "kg"}`
                               : "-"}
-                          </td>
-                          <td className="whitespace-nowrap">
+                          </td> */}
+                          {/* <td className="whitespace-nowrap">
                             {item.dimension_length &&
                             item.dimension_width &&
                             item.dimension_height
@@ -221,7 +221,7 @@ export default function CustomerInventory() {
                                   item.dimension_unit || "cm"
                                 }`
                               : "-"}
-                          </td>
+                          </td> */}
                           <td>
                             <StatusBadge status={item.status} />
                           </td>
