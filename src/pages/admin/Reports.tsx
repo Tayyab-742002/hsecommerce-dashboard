@@ -50,14 +50,6 @@ const PIE_COLORS = [
   CHART_COLORS.teal,
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: CHART_COLORS.warning,
-  approved: CHART_COLORS.success,
-  "in-progress": CHART_COLORS.secondary,
-  completed: CHART_COLORS.success,
-  cancelled: CHART_COLORS.danger,
-};
-
 interface Stats {
   totalRevenue: number;
   monthlyOrders: number;
@@ -228,9 +220,9 @@ export default function AdminReports() {
   const handleRefresh = () => fetchReportData(true);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-PK", {
+    return new Intl.NumberFormat("en-GB", {
       style: "currency",
-      currency: "USD",
+      currency: "GBP",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
@@ -304,11 +296,11 @@ export default function AdminReports() {
           value={stats.monthlyOrders}
           icon={TrendingUp}
         />
-        <KPICard
+        {/* <KPICard
           title="Inventory Value"
           value={formatCurrency(stats.inventoryValue)}
           icon={Package}
-        />
+        /> */}
         <KPICard
           title="Active Customers"
           value={stats.activeCustomers}
@@ -365,7 +357,7 @@ export default function AdminReports() {
                   stroke={CHART_COLORS.primary}
                   strokeWidth={2}
                   fill="url(#colorRevenue)"
-                  name="Revenue (USD)"
+                  name="Revenue (GBP)"
                 />
               </AreaChart>
             </ResponsiveContainer>

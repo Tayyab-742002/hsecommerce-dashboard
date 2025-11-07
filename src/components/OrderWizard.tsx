@@ -39,15 +39,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
     customer_id: "",
     warehouse_id: "",
     order_type: "delivery",
-    priority: "normal",
     requested_date: new Date().toISOString().split("T")[0],
-    delivery_contact_name: "",
-    delivery_contact_phone: "",
-    delivery_address_line1: "",
-    delivery_city: "",
-    delivery_state: "",
-    delivery_postal_code: "",
-    delivery_country: "Pakistan",
     special_instructions: "",
     handling_charges: 0,
     delivery_charges: 0,
@@ -296,26 +288,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Priority *</Label>
-            <Select
-              value={orderData.priority}
-              onValueChange={(value) =>
-                setOrderData({ ...orderData, priority: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Requested Date *</Label>
+            <Label>Order Dispatch Date *</Label>
             <Input
               type="date"
               value={orderData.requested_date}
@@ -325,76 +298,6 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
             />
           </div>
         </div>
-
-        {orderData.order_type === "delivery" && (
-          <Card>
-            <CardContent className="pt-6">
-              <h3 className="font-semibold mb-4">Delivery Information</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Contact Name</Label>
-                  <Input
-                    value={orderData.delivery_contact_name}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                        delivery_contact_name: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Contact Phone</Label>
-                  <Input
-                    value={orderData.delivery_contact_phone}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                        delivery_contact_phone: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label>Address</Label>
-                  <Input
-                    value={orderData.delivery_address_line1}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                        delivery_address_line1: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>City</Label>
-                  <Input
-                    value={orderData.delivery_city}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                        delivery_city: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Postal Code</Label>
-                  <Input
-                    value={orderData.delivery_postal_code}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                        delivery_postal_code: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button
@@ -470,8 +373,11 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
         </Button>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-          <Button variant="outline" onClick={() => setStep("1")}
-            className="w-full sm:w-auto">
+          <Button
+            variant="outline"
+            onClick={() => setStep("1")}
+            className="w-full sm:w-auto"
+          >
             Back
           </Button>
           <Button
@@ -489,7 +395,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           <CardContent className="pt-6 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Handling Charges (USD)</Label>
+                <Label>Handling Charges (GBP)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -503,7 +409,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Delivery Charges (USD)</Label>
+                <Label>Delivery Charges (GBP)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -560,10 +466,16 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
         </Card>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-          <Button variant="outline" onClick={() => setStep("2")} className="w-full sm:w-auto">
+          <Button
+            variant="outline"
+            onClick={() => setStep("2")}
+            className="w-full sm:w-auto"
+          >
             Back
           </Button>
-          <Button onClick={handleSubmit} className="w-full sm:w-auto">Create Order</Button>
+          <Button onClick={handleSubmit} className="w-full sm:w-auto">
+            Create Order
+          </Button>
         </div>
       </TabsContent>
     </Tabs>

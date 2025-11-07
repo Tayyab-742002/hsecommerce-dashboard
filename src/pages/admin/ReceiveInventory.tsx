@@ -279,7 +279,7 @@ export default function ReceiveInventory() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Declared Value (USD)</Label>
+                  <Label>Declared Value (GBP)</Label>
                   <Input
                     type="number"
                     step="0.01"

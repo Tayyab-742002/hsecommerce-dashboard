@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, FileText, Clock, TrendingUp } from "lucide-react";
 import { KPICard } from "@/components/KPICard";
+import { formatCurrency } from "@/lib/currency";
 
 export default function CustomerDashboard() {
   const { userRole } = useAuth();
@@ -73,7 +74,7 @@ export default function CustomerDashboard() {
         />
         <KPICard
           title="Current Charges"
-          value={`$${stats.currentCharges.toFixed(2)}`}
+          value={formatCurrency(stats.currentCharges)}
           icon={TrendingUp}
         />
         <KPICard

@@ -212,14 +212,14 @@ export default function AdminInventory() {
                       <div className="text-right">
                         {item.quantity} {item.unit_of_measure || "pcs"}
                       </div>
-                      <div className="text-muted-foreground text-xs">
+                      {/* <div className="text-muted-foreground text-xs">
                         Weight
-                      </div>
-                      <div className="text-right">
+                      </div> */}
+                      {/* <div className="text-right">
                         {item.weight
                           ? `${item.weight} ${item.weight_unit || "kg"}`
                           : "-"}
-                      </div>
+                      </div> */}
                       {/* <div className="text-muted-foreground text-xs">Size</div>
                       <div className="text-right">
                         {item.dimension_length &&
@@ -282,9 +282,9 @@ export default function AdminInventory() {
                       <th className="px-3 py-3 text-left font-medium">
                         Quantity
                       </th>
-                      <th className="px-3 py-3 text-left font-medium">
+                      {/* <th className="px-3 py-3 text-left font-medium">
                         Weight
-                      </th>
+                      </th> */}
                       <th className="px-3 py-3 text-left font-medium">
                         Status
                       </th>
@@ -337,11 +337,11 @@ export default function AdminInventory() {
                           <td className="px-3 py-3 whitespace-nowrap">
                             {item.quantity}
                           </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
+                          {/* <td className="px-3 py-3 whitespace-nowrap">
                             {item.weight
                               ? `${item.weight} ${item.weight_unit || "kg"}`
                               : "-"}
-                          </td>
+                          </td> */}
                           <td className="px-3 py-3 whitespace-nowrap">
                             <StatusBadge status={item.status} />
                           </td>

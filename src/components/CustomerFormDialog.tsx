@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -64,16 +64,9 @@ const customerSchema = z
     address_line1: z.string().optional(),
     address_line2: z.string().optional(),
     city: z.string().optional(),
-    state: z.string().optional(),
     country: z.string().min(1, "Country is required"),
     postal_code: z.string().optional(),
     status: z.enum(["active", "inactive", "suspended"]).default("active"),
-    credit_limit: z
-      .union([z.number(), z.nan()])
-      .transform((v) => (Number.isNaN(v) ? 0 : v))
-      .pipe(z.number().min(0, "Must be 0 or greater")),
-    payment_terms: z.string().optional(),
-    tax_id: z.string().optional(),
     notes: z.string().optional(),
     createLogin: z.boolean().optional().default(false),
     password: z.string().optional(),
@@ -97,19 +90,16 @@ export default function CustomerFormDialog({
   customer,
   onSuccess,
 }: CustomerFormDialogProps) {
-  const [formData, setFormData] = useState<Customer>(
-    customer || {
-      customer_code: "",
-      company_name: "",
-      contact_person: "",
-      email: "",
-      phone: "",
-      customer_type: "business",
-      country: "Pakistan",
-      status: "active",
-      credit_limit: 0,
-    }
-  );
+  const [formData, setFormData] = useState<Customer>({
+    customer_code: "",
+    company_name: "",
+    contact_person: "",
+    email: "",
+    phone: "",
+    customer_type: "business",
+    country: "Pakistan",
+    status: "active",
+  });
   const [loading, setLoading] = useState(false);
   const [createLogin, setCreateLogin] = useState(false);
   const [password, setPassword] = useState("");
@@ -117,6 +107,48 @@ export default function CustomerFormDialog({
     "customer_user"
   );
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Update formData when customer prop changes
+  useEffect(() => {
+    if (customer) {
+      setFormData({
+        customer_code: customer.customer_code || "",
+        company_name: customer.company_name || "",
+        contact_person: customer.contact_person || "",
+        email: customer.email || "",
+        phone: customer.phone || "",
+        alternate_phone: customer.alternate_phone || "",
+        customer_type: customer.customer_type || "business",
+        address_line1: customer.address_line1 || "",
+        address_line2: customer.address_line2 || "",
+        city: customer.city || "",
+        country: customer.country || "Pakistan",
+        postal_code: customer.postal_code || "",
+        status: customer.status || "active",
+        notes: customer.notes || "",
+      });
+      setCreateLogin(false);
+      setPassword("");
+      setUserRole("customer_user");
+      setFormErrors({});
+    } else {
+      // Reset form when adding new customer
+      setFormData({
+        customer_code: "",
+        company_name: "",
+        contact_person: "",
+        email: "",
+        phone: "",
+        customer_type: "business",
+        country: "Pakistan",
+        status: "active",
+      });
+      setCreateLogin(false);
+      setPassword("");
+      setUserRole("customer_user");
+      setFormErrors({});
+    }
+  }, [customer, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,10 +173,14 @@ export default function CustomerFormDialog({
       }
       setFormErrors({});
 
+      // Remove excluded fields from formData before submission
+      const { state, credit_limit, payment_terms, tax_id, ...submitData } =
+        formData;
+
       if (customer?.id) {
         const { error } = await supabase
           .from("customers")
-          .update(formData)
+          .update(submitData)
           .eq("id", customer.id);
 
         if (error) throw error;
@@ -153,7 +189,7 @@ export default function CustomerFormDialog({
         // Create customer record
         const { data: newCustomer, error: customerError } = await supabase
           .from("customers")
-          .insert(formData)
+          .insert(submitData)
           .select()
           .single();
 
@@ -219,6 +255,23 @@ export default function CustomerFormDialog({
 
       onSuccess();
       onOpenChange(false);
+      // Reset form after successful submission
+      if (!customer) {
+        setFormData({
+          customer_code: "",
+          company_name: "",
+          contact_person: "",
+          email: "",
+          phone: "",
+          customer_type: "business",
+          country: "Pakistan",
+          status: "active",
+        });
+        setCreateLogin(false);
+        setPassword("");
+        setUserRole("customer_user");
+      }
+      setFormErrors({});
     } catch (error: unknown) {
       const message =
         typeof error === "object" && error !== null && "message" in error
@@ -379,7 +432,7 @@ export default function CustomerFormDialog({
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="city">City</Label>
               <Input
@@ -387,16 +440,6 @@ export default function CustomerFormDialog({
                 value={formData.city || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, city: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="state">State</Label>
-              <Input
-                id="state"
-                value={formData.state || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, state: e.target.value })
                 }
               />
             </div>
@@ -446,50 +489,6 @@ export default function CustomerFormDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="credit_limit">Credit Limit (USD)</Label>
-              <Input
-                id="credit_limit"
-                type="number"
-                value={formData.credit_limit || 0}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    credit_limit: parseFloat(e.target.value),
-                  })
-                }
-              />
-              {formErrors.credit_limit && (
-                <p className="text-sm text-destructive mt-1">
-                  {formErrors.credit_limit}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="payment_terms">Payment Terms</Label>
-              <Input
-                id="payment_terms"
-                value={formData.payment_terms || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, payment_terms: e.target.value })
-                }
-                placeholder="e.g., Net 30"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="tax_id">Tax ID</Label>
-            <Input
-              id="tax_id"
-              value={formData.tax_id || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, tax_id: e.target.value })
-              }
-            />
           </div>
 
           <div>

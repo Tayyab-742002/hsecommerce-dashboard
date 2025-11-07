@@ -259,9 +259,9 @@ export default function AdminCustomers() {
                         <th>Address</th>
                         <th>Location</th>
                         <th>Status</th>
-                        <th>Credit Limit</th>
-                        <th>Payment Terms</th>
-                        <th>Tax ID</th>
+                        {/* <th>Credit Limit</th> */}
+                        {/* <th>Payment Terms</th> */}
+                        {/* <th>Tax ID</th> */}
                         <th>Joined</th>
                         <th>Actions</th>
                       </tr>
@@ -295,22 +295,24 @@ export default function AdminCustomers() {
                             {customer.address_line1 || "-"}
                           </td>
                           <td className="whitespace-nowrap">
-                            {customer.city}, {customer.country}
+                            {customer.city
+                              ? `${customer.city}, ${customer.country}`
+                              : customer.country}
                           </td>
                           <td>
                             <StatusBadge status={customer.status} />
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {typeof customer.credit_limit === "number"
                               ? formatCurrency(customer.credit_limit)
                               : "-"}
-                          </td>
-                          <td className="whitespace-nowrap">
+                          </td> */}
+                          {/* <td className="whitespace-nowrap">
                             {customer.payment_terms || "-"}
-                          </td>
-                          <td className="whitespace-nowrap">
+                          </td> */}
+                          {/* <td className="whitespace-nowrap">
                             {customer.tax_id || "-"}
-                          </td>
+                          </td> */}
                           <td className="whitespace-nowrap">
                             {new Date(customer.created_at).toLocaleDateString()}
                           </td>

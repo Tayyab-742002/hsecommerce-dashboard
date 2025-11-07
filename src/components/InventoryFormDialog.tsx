@@ -62,21 +62,16 @@ export default function InventoryFormDialog({
   item,
   onSuccess,
 }: InventoryFormDialogProps) {
-  const [formData, setFormData] = useState<InventoryItem>(
-    item || {
-      item_code: "",
-      item_name: "",
-      customer_id: "",
-      warehouse_id: "",
-      quantity: 1,
-      unit_of_measure: "pcs",
-      weight_unit: "kg",
-      received_date: new Date().toISOString().split("T")[0],
-      condition_on_arrival: "good",
-      current_condition: "good",
-      status: "in_stock",
-    }
-  );
+  const [formData, setFormData] = useState<InventoryItem>({
+    item_code: "",
+    item_name: "",
+    customer_id: "",
+    warehouse_id: "",
+    quantity: 1,
+    unit_of_measure: "pcs",
+    received_date: new Date().toISOString().split("T")[0],
+    status: "in_stock",
+  });
   type CustomerOption = Pick<
     Tables<"customers">,
     "id" | "customer_code" | "company_name" | "contact_person"
@@ -90,8 +85,41 @@ export default function InventoryFormDialog({
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  type ConditionOnArrival = "good" | "damaged" | "requires_inspection";
-  type CurrentCondition = "good" | "damaged" | "deteriorated";
+  // Update formData when item prop changes
+  useEffect(() => {
+    if (item) {
+      setFormData({
+        item_code: item.item_code || "",
+        item_name: item.item_name || "",
+        description: item.description || "",
+        category: item.category || "",
+        customer_id: item.customer_id || "",
+        warehouse_id: item.warehouse_id || "",
+        quantity: item.quantity || 1,
+        unit_of_measure: item.unit_of_measure || "pcs",
+        received_date:
+          item.received_date || new Date().toISOString().split("T")[0],
+        status: item.status || "in_stock",
+        storage_rate: item.storage_rate || undefined,
+        notes: item.notes || "",
+      });
+      setFormErrors({});
+    } else {
+      // Reset form when adding new item
+      setFormData({
+        item_code: "",
+        item_name: "",
+        customer_id: "",
+        warehouse_id: "",
+        quantity: 1,
+        unit_of_measure: "pcs",
+        received_date: new Date().toISOString().split("T")[0],
+        status: "in_stock",
+      });
+      setFormErrors({});
+    }
+  }, [item, open]);
+
   type StatusType = "in_stock" | "reserved" | "shipped" | "damaged";
 
   const schema = z.object({
@@ -103,26 +131,12 @@ export default function InventoryFormDialog({
     warehouse_id: z.string().min(1, "Warehouse is required"),
     quantity: z.number().int().min(1, "Quantity must be at least 1"),
     unit_of_measure: z.string().optional(),
-    weight: z
-      .number()
-      .nonnegative({ message: "Weight must be >= 0" })
-      .optional(),
-    weight_unit: z.string().optional(),
     received_date: z.string().min(1, "Received date is required"),
-    declared_value: z
-      .number()
-      .nonnegative({ message: "Declared value must be >= 0" })
-      .optional(),
     storage_rate: z
       .number()
       .nonnegative({ message: "Storage rate must be >= 0" })
       .optional(),
-    condition_on_arrival: z
-      .enum(["good", "damaged", "requires_inspection"])
-      .optional(),
-    current_condition: z.enum(["good", "damaged", "deteriorated"]).optional(),
     status: z.enum(["in_stock", "reserved", "shipped", "damaged"]).optional(),
-    barcode: z.string().optional(),
     notes: z.string().optional(),
   });
 
@@ -164,29 +178,14 @@ export default function InventoryFormDialog({
         warehouse_id: formData.warehouse_id,
         quantity: Number(formData.quantity),
         unit_of_measure: formData.unit_of_measure,
-        weight: formData.weight,
-        weight_unit: formData.weight_unit,
         received_date: formData.received_date,
-        declared_value:
-          typeof formData.declared_value === "number"
-            ? formData.declared_value
-            : formData.declared_value
-            ? Number(formData.declared_value)
-            : undefined,
         storage_rate:
           typeof formData.storage_rate === "number"
             ? formData.storage_rate
             : formData.storage_rate
             ? Number(formData.storage_rate)
             : undefined,
-        condition_on_arrival: (formData.condition_on_arrival || undefined) as
-          | ConditionOnArrival
-          | undefined,
-        current_condition: (formData.current_condition || undefined) as
-          | CurrentCondition
-          | undefined,
         status: (formData.status || undefined) as StatusType | undefined,
-        barcode: formData.barcode,
         notes: formData.notes,
       });
 
@@ -213,21 +212,12 @@ export default function InventoryFormDialog({
         warehouse_id: formData.warehouse_id,
         quantity: Number(formData.quantity),
         unit_of_measure: formData.unit_of_measure ?? null,
-        weight: typeof formData.weight === "number" ? formData.weight : null,
-        weight_unit: formData.weight_unit ?? null,
         received_date: formData.received_date,
-        declared_value:
-          typeof formData.declared_value === "number"
-            ? formData.declared_value
-            : null,
         storage_rate:
           typeof formData.storage_rate === "number"
             ? formData.storage_rate
             : null,
-        condition_on_arrival: formData.condition_on_arrival ?? null,
-        current_condition: formData.current_condition ?? null,
         status: formData.status ?? null,
-        barcode: formData.barcode ?? null,
         notes: formData.notes ?? null,
       };
 
@@ -400,7 +390,7 @@ export default function InventoryFormDialog({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="quantity">Quantity *</Label>
               <Input
@@ -441,106 +431,9 @@ export default function InventoryFormDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="declared_value">Declared Value (USD)</Label>
-              <Input
-                id="declared_value"
-                type="number"
-                value={formData.declared_value || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    declared_value: parseFloat(e.target.value),
-                  })
-                }
-              />
-              {formErrors.declared_value && (
-                <p className="text-sm text-destructive mt-1">
-                  {formErrors.declared_value}
-                </p>
-              )}
-            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="weight">Weight</Label>
-              <Input
-                id="weight"
-                type="number"
-                value={formData.weight || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    weight: parseFloat(e.target.value),
-                  })
-                }
-              />
-              {formErrors.weight && (
-                <p className="text-sm text-destructive mt-1">
-                  {formErrors.weight}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="weight_unit">Weight Unit</Label>
-              <Select
-                value={formData.weight_unit}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, weight_unit: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="kg">Kilogram</SelectItem>
-                  <SelectItem value="g">Gram</SelectItem>
-                  <SelectItem value="lb">Pound</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <Label htmlFor="condition_on_arrival">Condition on Arrival</Label>
-              <Select
-                value={formData.condition_on_arrival}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, condition_on_arrival: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="good">Good</SelectItem>
-                  <SelectItem value="damaged">Damaged</SelectItem>
-                  <SelectItem value="requires_inspection">
-                    Requires Inspection
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="current_condition">Current Condition</Label>
-              <Select
-                value={formData.current_condition}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, current_condition: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="good">Good</SelectItem>
-                  <SelectItem value="damaged">Damaged</SelectItem>
-                  <SelectItem value="deteriorated">Deteriorated</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div>
               <Label htmlFor="status">Status</Label>
               <Select
@@ -560,21 +453,8 @@ export default function InventoryFormDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="barcode">Barcode</Label>
-              <Input
-                id="barcode"
-                value={formData.barcode || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, barcode: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="storage_rate">Storage Rate (USD/month)</Label>
+              <Label htmlFor="storage_rate">Storage Rate (GBP/month)</Label>
               <Input
                 id="storage_rate"
                 type="number"
