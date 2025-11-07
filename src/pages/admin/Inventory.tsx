@@ -57,14 +57,9 @@ export default function AdminInventory() {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
 
-  useEffect(
-    () => {
-      fetchInventory();
-    },
-    [
-      /* fetchInventory intentionally not included to avoid unnecessary effects */
-    ]
-  );
+  useEffect(() => {
+    fetchInventory();
+  }, []);
 
   const fetchInventory = async () => {
     try {
@@ -198,14 +193,14 @@ export default function AdminInventory() {
                         {item.customers?.company_name ||
                           item.customers?.contact_person}
                       </div>
-                      <div className="text-muted-foreground text-xs">
+                      {/* <div className="text-muted-foreground text-xs">
                         Warehouse
-                      </div>
-                      <div className="text-right">
+                      </div> */}
+                      {/* <div className="text-right">
                         {item.warehouses?.warehouse_name}
-                      </div>
-                      <div className="text-muted-foreground text-xs">SKU</div>
-                      <div className="text-right">{item.sku || "-"}</div>
+                      </div> */}
+                      {/* <div className="text-muted-foreground text-xs">SKU</div>
+                      <div className="text-right">{item.sku || "-"}</div> */}
                       <div className="text-muted-foreground text-xs">
                         Category
                       </div>
@@ -224,7 +219,7 @@ export default function AdminInventory() {
                           ? `${item.weight} ${item.weight_unit || "kg"}`
                           : "-"}
                       </div>
-                      <div className="text-muted-foreground text-xs">Size</div>
+                      {/* <div className="text-muted-foreground text-xs">Size</div>
                       <div className="text-right">
                         {item.dimension_length &&
                         item.dimension_width &&
@@ -233,7 +228,7 @@ export default function AdminInventory() {
                               item.dimension_height
                             } ${item.dimension_unit || "cm"}`
                           : "-"}
-                      </div>
+                      </div> */}
                       <div className="text-muted-foreground text-xs">
                         Received
                       </div>
@@ -273,14 +268,14 @@ export default function AdminInventory() {
                     <tr>
                       <th>Item Code</th>
                       <th>Item Name</th>
-                      <th>SKU</th>
+                      {/* <th>SKU</th> */}
                       <th>Category</th>
                       <th>Customer</th>
-                      <th>Warehouse</th>
+                      {/* <th>Warehouse</th> */}
                       <th>Quantity</th>
-                      <th>UoM</th>
+                      {/* <th>UoM</th> */}
                       <th>Weight</th>
-                      <th>Dimensions</th>
+                      {/* <th>Dimensions</th> */}
                       <th>Status</th>
                       <th>Received Date</th>
                       <th>Actions</th>
@@ -314,9 +309,9 @@ export default function AdminInventory() {
                           <td className="whitespace-nowrap">
                             {item.item_name}
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {item.sku || "-"}
-                          </td>
+                          </td> */}
                           <td className="capitalize whitespace-nowrap">
                             {item.category || "-"}
                           </td>
@@ -324,9 +319,9 @@ export default function AdminInventory() {
                             {item.customers?.company_name ||
                               item.customers?.contact_person}
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {item.warehouses?.warehouse_name}
-                          </td>
+                          </td> */}
                           <td className="whitespace-nowrap">{item.quantity}</td>
                           <td className="whitespace-nowrap">
                             {item.unit_of_measure || "pcs"}
@@ -336,7 +331,7 @@ export default function AdminInventory() {
                               ? `${item.weight} ${item.weight_unit || "kg"}`
                               : "-"}
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {item.dimension_length &&
                             item.dimension_width &&
                             item.dimension_height
@@ -346,7 +341,7 @@ export default function AdminInventory() {
                                   item.dimension_unit || "cm"
                                 }`
                               : "-"}
-                          </td>
+                          </td> */}
                           <td>
                             <StatusBadge status={item.status} />
                           </td>

@@ -47,7 +47,7 @@ export default function CustomerDashboard() {
     setStats({
       totalItems: itemCount || 0,
       pendingOrders: pendingCount || 0,
-      currentCharges: 0, // TODO: Calculate from invoices
+      currentCharges: 0, 
       recentActivity: orders || [],
     });
   };

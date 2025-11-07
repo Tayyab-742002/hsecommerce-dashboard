@@ -284,7 +284,7 @@
   }
 
   .data-table tbody tr {
-    @apply hover:bg-[hsl(var(--table-hover))];
+    @apply hover:bg-neutral-300 ;
     transition: background-color var(--duration-fast) ease;
   }
 

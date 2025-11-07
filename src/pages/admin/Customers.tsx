@@ -111,7 +111,6 @@ export default function AdminCustomers() {
       setCustomerToDelete(null);
     }
   };
-
   const handleViewInventory = (customerId: string) => {
     navigate(`/admin/inventory?customer=${customerId}`);
   };
@@ -267,7 +266,11 @@ export default function AdminCustomers() {
                     </thead>
                     <tbody>
                       {filteredCustomers.map((customer) => (
-                        <tr key={customer.id}>
+                        <tr
+                          key={customer.id}
+                          className="cursor-pointer"
+                          onClick={() => handleViewInventory(customer.id)}
+                        >
                           <td className="font-medium whitespace-nowrap">
                             {customer.customer_code}
                           </td>
@@ -309,26 +312,33 @@ export default function AdminCustomers() {
                           <td className="whitespace-nowrap">
                             {new Date(customer.created_at).toLocaleDateString()}
                           </td>
-                          <td>
+                          <td >
                             <div className="flex gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleViewInventory(customer.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewInventory(customer.id);
+                                }}
                               >
                                 <Eye className="h-4 w-4 mr-1" /> Inventory
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleEdit(customer)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEdit(customer);
+                                }}
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setCustomerToDelete(customer.id);
                                   setDeleteDialogOpen(true);
                                 }}

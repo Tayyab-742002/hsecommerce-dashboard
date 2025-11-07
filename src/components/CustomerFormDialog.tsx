@@ -19,6 +19,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
 
 interface Customer {
   id?: string;
@@ -49,6 +50,47 @@ interface CustomerFormDialogProps {
   onSuccess: () => void;
 }
 
+const customerSchema = z
+  .object({
+    customer_code: z.string().min(1, "Customer code is required"),
+    company_name: z.string().optional(),
+    contact_person: z.string().min(1, "Contact person is required"),
+    email: z.string().email("Enter a valid email address"),
+    phone: z.string().min(1, "Phone is required"),
+    alternate_phone: z.string().optional(),
+    customer_type: z.enum(["business", "individual"], {
+      required_error: "Customer type is required",
+    }),
+    address_line1: z.string().optional(),
+    address_line2: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    country: z.string().min(1, "Country is required"),
+    postal_code: z.string().optional(),
+    status: z.enum(["active", "inactive", "suspended"]).default("active"),
+    credit_limit: z
+      .union([z.number(), z.nan()])
+      .transform((v) => (Number.isNaN(v) ? 0 : v))
+      .pipe(z.number().min(0, "Must be 0 or greater")),
+    payment_terms: z.string().optional(),
+    tax_id: z.string().optional(),
+    notes: z.string().optional(),
+    createLogin: z.boolean().optional().default(false),
+    password: z.string().optional(),
+    userRole: z.enum(["customer_admin", "customer_user"]).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.createLogin) {
+      if (!val.password || val.password.length < 8) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Password must be at least 8 characters",
+          path: ["password"],
+        });
+      }
+    }
+  });
+
 export default function CustomerFormDialog({
   open,
   onOpenChange,
@@ -74,12 +116,31 @@ export default function CustomerFormDialog({
   const [userRole, setUserRole] = useState<"customer_admin" | "customer_user">(
     "customer_user"
   );
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      const validateResult = customerSchema.safeParse({
+        ...formData,
+        createLogin,
+        password,
+        userRole,
+      });
+      if (!validateResult.success) {
+        const fieldErrors: Record<string, string> = {};
+        for (const issue of validateResult.error.issues) {
+          const path = (issue.path?.[0] as string) || "form";
+          if (!fieldErrors[path]) fieldErrors[path] = issue.message;
+        }
+        setFormErrors(fieldErrors);
+        setLoading(false);
+        return;
+      }
+      setFormErrors({});
+
       if (customer?.id) {
         const { error } = await supabase
           .from("customers")
@@ -207,6 +268,11 @@ export default function CustomerFormDialog({
                   <SelectItem value="individual">Individual</SelectItem>
                 </SelectContent>
               </Select>
+              {formErrors.customer_type && (
+                <p className="text-sm text-destructive mt-1">
+                  {formErrors.customer_type}
+                </p>
+              )}
             </div>
           </div>
 
@@ -219,6 +285,11 @@ export default function CustomerFormDialog({
                 setFormData({ ...formData, company_name: e.target.value })
               }
             />
+            {formErrors.company_name && (
+              <p className="text-sm text-destructive mt-1">
+                {formErrors.company_name}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -232,6 +303,11 @@ export default function CustomerFormDialog({
                 }
                 required
               />
+              {formErrors.contact_person && (
+                <p className="text-sm text-destructive mt-1">
+                  {formErrors.contact_person}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="email">Email *</Label>
@@ -244,6 +320,11 @@ export default function CustomerFormDialog({
                 }
                 required
               />
+              {formErrors.email && (
+                <p className="text-sm text-destructive mt-1">
+                  {formErrors.email}
+                </p>
+              )}
             </div>
           </div>
 
@@ -258,6 +339,11 @@ export default function CustomerFormDialog({
                 }
                 required
               />
+              {formErrors.phone && (
+                <p className="text-sm text-destructive mt-1">
+                  {formErrors.phone}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="alternate_phone">Alternate Phone</Label>
@@ -336,6 +422,11 @@ export default function CustomerFormDialog({
                   setFormData({ ...formData, country: e.target.value })
                 }
               />
+              {formErrors.country && (
+                <p className="text-sm text-destructive mt-1">
+                  {formErrors.country}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="status">Status</Label>
@@ -371,6 +462,11 @@ export default function CustomerFormDialog({
                   })
                 }
               />
+              {formErrors.credit_limit && (
+                <p className="text-sm text-destructive mt-1">
+                  {formErrors.credit_limit}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="payment_terms">Payment Terms</Label>
@@ -435,6 +531,11 @@ export default function CustomerFormDialog({
                       required
                       placeholder="Enter temporary password"
                     />
+                    {formErrors.password && (
+                      <p className="text-sm text-destructive mt-1">
+                        {formErrors.password}
+                      </p>
+                    )}
                   </div>
 
                   <div>

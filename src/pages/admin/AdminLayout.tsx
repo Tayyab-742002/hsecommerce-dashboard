@@ -10,20 +10,18 @@ import {
   FileText,
   Settings,
   LogOut,
-  PackagePlus,
   Menu,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import Spinner from "@/components/Spinner";
-
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+  { name: "Customers", href: "/admin/customers", icon: Users },
   { name: "Inventory", href: "/admin/inventory", icon: PackageSearch },
   // { name: 'Receive Items', href: '/admin/receive-inventory', icon: PackagePlus },
   { name: "Orders", href: "/admin/orders", icon: Package },
-  { name: "Customers", href: "/admin/customers", icon: Users },
   { name: "Reports", href: "/admin/reports", icon: FileText },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
@@ -63,9 +61,7 @@ export default function AdminLayout() {
       <aside className="hidden md:flex md:w-64 bg-sidebar border-r border-sidebar-border flex-col shadow-lg">
         <div className="p-5 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary/10 rounded-xl shadow-sm">
-              <Package className="h-5 w-5 text-primary" />
-            </div>
+            <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
             <div>
               <h1 className="text-base font-bold text-sidebar-foreground tracking-tight">
                 HSEcommerce
@@ -133,9 +129,7 @@ export default function AdminLayout() {
         >
           <div className="p-5 border-b border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-primary/10 rounded-xl shadow-sm">
-                <Package className="h-5 w-5 text-primary" />
-              </div>
+              <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
               <div>
                 <h1 className="text-base font-bold text-sidebar-foreground tracking-tight">
                   HSEcommerce
@@ -197,7 +191,7 @@ export default function AdminLayout() {
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
+            <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
             <span className="font-semibold text-sm tracking-tight">
               HSEcommerce
             </span>

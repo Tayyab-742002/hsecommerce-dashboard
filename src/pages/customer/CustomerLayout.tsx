@@ -2,16 +2,22 @@ import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import Spinner from "@/components/Spinner";
-import { Package, LayoutDashboard, PackageSearch, FileText, LogOut } from "lucide-react";
+import {
+  Package,
+  LayoutDashboard,
+  PackageSearch,
+  FileText,
+  LogOut,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: 'Dashboard', href: '/customer/dashboard', icon: LayoutDashboard },
-  { name: 'My Inventory', href: '/customer/inventory', icon: PackageSearch },
-  { name: 'Orders', href: '/customer/orders', icon: Package },
-  { name: 'Billing', href: '/customer/billing', icon: FileText },
+  { name: "Dashboard", href: "/customer/dashboard", icon: LayoutDashboard },
+  { name: "My Inventory", href: "/customer/inventory", icon: PackageSearch },
+  { name: "Orders", href: "/customer/orders", icon: Package },
+  { name: "Billing", href: "/customer/billing", icon: FileText },
 ];
 
 export default function CustomerLayout() {
@@ -21,7 +27,7 @@ export default function CustomerLayout() {
 
   // Redirect if not customer
   if (!loading && (!user || !isCustomer())) {
-    navigate('/login');
+    navigate("/login");
     return null;
   }
 
@@ -39,7 +45,7 @@ export default function CustomerLayout() {
       title: "Logged out",
       description: "You have been logged out successfully",
     });
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
@@ -49,7 +55,7 @@ export default function CustomerLayout() {
         <div className="container mx-auto px-4 py-3.5 flex items-center justify-between max-w-7xl">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-primary/10 rounded-xl shadow-sm">
-              <Package className="h-5 w-5 text-primary" />
+              <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
             </div>
             <h1 className="text-lg font-bold tracking-tight">HSEcommerce</h1>
           </div>
