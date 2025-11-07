@@ -118,14 +118,14 @@ export default function CustomerInventory() {
                       <StatusBadge status={item.status} />
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm">
-                      <div className="text-muted-foreground text-xs">
+                      {/* <div className="text-muted-foreground text-xs">
                         Warehouse
                       </div>
                       <div className="text-right">
                         {item.warehouses?.warehouse_name}
-                      </div>
-                      <div className="text-muted-foreground text-xs">SKU</div>
-                      <div className="text-right">{item.sku || "-"}</div>
+                      </div> */}
+                        {/* <div className="text-muted-foreground text-xs">SKU</div>
+                        <div className="text-right">{item.sku || "-"}</div> */}
                       <div className="text-muted-foreground text-xs">
                         Category
                       </div>
@@ -144,7 +144,7 @@ export default function CustomerInventory() {
                           ? `${item.weight} ${item.weight_unit || "kg"}`
                           : "-"}
                       </div>
-                      <div className="text-muted-foreground text-xs">Size</div>
+                      {/* <div className="text-muted-foreground text-xs">Size</div>
                       <div className="text-right">
                         {item.dimension_length &&
                         item.dimension_width &&
@@ -153,7 +153,7 @@ export default function CustomerInventory() {
                               item.dimension_height
                             } ${item.dimension_unit || "cm"}`
                           : "-"}
-                      </div>
+                      </div> */}
                       <div className="text-muted-foreground text-xs">
                         Received
                       </div>
@@ -173,13 +173,13 @@ export default function CustomerInventory() {
                       <tr>
                         <th>Item Code</th>
                         <th>Item Name</th>
-                        <th>SKU</th>
+                        {/* <th>SKU</th> */}
                         <th>Category</th>
-                        <th>Warehouse</th>
+                        {/* <th>Warehouse</th> */}
                         <th>Quantity</th>
-                        <th>UoM</th>
+                        {/* <th>UoM</th> */}
                         <th>Weight</th>
-                        <th>Dimensions</th>
+                        {/* <th>Dimensions</th> */}
                         <th>Status</th>
                         <th>Received Date</th>
                       </tr>
@@ -193,19 +193,19 @@ export default function CustomerInventory() {
                           <td className="whitespace-nowrap">
                             {item.item_name}
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {item.sku || "-"}
-                          </td>
+                          </td> */}
                           <td className="capitalize whitespace-nowrap">
                             {item.category || "-"}
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {item.warehouses?.warehouse_name}
-                          </td>
+                          </td> */}
                           <td className="whitespace-nowrap">{item.quantity}</td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {item.unit_of_measure || "pcs"}
-                          </td>
+                          </td> */}
                           <td className="whitespace-nowrap">
                             {item.weight
                               ? `${item.weight} ${item.weight_unit || "kg"}`
