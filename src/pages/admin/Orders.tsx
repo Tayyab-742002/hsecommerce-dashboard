@@ -127,44 +127,48 @@ export default function AdminOrders() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Orders Management</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">
+            Orders Management
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Manage outbound orders and deliveries
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Order
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Order</DialogTitle>
-            </DialogHeader>
-            <OrderWizard
-              onComplete={() => {
-                setDialogOpen(false);
-                fetchOrders();
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="w-full sm:w-auto">
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Order
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Order</DialogTitle>
+              </DialogHeader>
+              <OrderWizard
+                onComplete={() => {
+                  setDialogOpen(false);
+                  fetchOrders();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Orders</CardTitle>
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-xl font-semibold">All Orders</CardTitle>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 transform h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by order number or customer..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 focus:border-none"
+              className="pl-10"
             />
           </div>
         </CardHeader>
@@ -180,11 +184,11 @@ export default function AdminOrders() {
           ) : (
             <>
               {/* Mobile: card list */}
-              <div className="md:hidden space-y-3">
+              <div className="space-y-3 sm:hidden">
                 {filteredOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
+                    className="rounded-lg border border-border bg-card p-3 shadow-sm"
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-semibold whitespace-nowrap">
@@ -259,84 +263,115 @@ export default function AdminOrders() {
               </div>
 
               {/* Desktop: wide table */}
-              <div className="hidden md:block w-full overflow-x-auto pb-2">
-                <div className="table-container min-w-[1000px] pr-4">
-                  <table className="data-table">
+              <div className="hidden sm:block">
+                <div className="w-full overflow-x-auto pb-2">
+                  <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr>
-                        <th>Order Number</th>
-                        <th>Customer</th>
-                        <th>Warehouse</th>
-                        <th>Type</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Items</th>
-                        <th>Requested Date</th>
-                        <th>Scheduled</th>
-                        <th>Completed</th>
-                        <th>Charges</th>
-                        <th>Contact</th>
-                        <th>City</th>
-                        <th>Actions</th>
+                      <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                        <th className="px-3 py-3 text-left font-medium">
+                          Order Number
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Customer
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Warehouse
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Type
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Priority
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Status
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Items
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Requested Date
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Scheduled
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Completed
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Charges
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Contact
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          City
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredOrders.map((order) => (
-                        <tr key={order.id}>
-                          <td className="font-medium whitespace-nowrap">
+                        <tr
+                          key={order.id}
+                          className="border-b border-border/60 last:border-b-0"
+                        >
+                          <td className="px-3 py-3 font-medium whitespace-nowrap">
                             {order.order_number}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {order.customers?.company_name ||
                               order.customers?.contact_person}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {order.warehouses?.warehouse_name}
                           </td>
-                          <td className="capitalize whitespace-nowrap">
+                          <td className="px-3 py-3 capitalize whitespace-nowrap">
                             {order.order_type}
                           </td>
-                          <td className="capitalize whitespace-nowrap">
+                          <td className="px-3 py-3 capitalize whitespace-nowrap">
                             {order.priority}
                           </td>
-                          <td>
+                          <td className="px-3 py-3">
                             <StatusBadge status={order.status} />
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {order.total_items} ({order.total_quantity} units)
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {new Date(
                               order.requested_date
                             ).toLocaleDateString()}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {order.scheduled_date
                               ? new Date(
                                   order.scheduled_date
                                 ).toLocaleDateString()
                               : "-"}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {order.completed_date
                               ? new Date(
                                   order.completed_date
                                 ).toLocaleDateString()
                               : "-"}
                           </td>
-                          <td className="font-medium whitespace-nowrap">
+                          <td className="px-3 py-3 font-medium whitespace-nowrap">
                             {formatCurrency(order.total_charges ?? 0)}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {order.delivery_contact_name || "-"}
                             {order.delivery_contact_phone
                               ? ` (${order.delivery_contact_phone})`
                               : ""}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {order.delivery_city || "-"}
                           </td>
-                          <td>
+                          <td className="px-3 py-3">
                             <div className="flex gap-2">
                               <Button
                                 size="sm"
@@ -345,8 +380,7 @@ export default function AdminOrders() {
                                   handleStatusChange(order.id, order.status)
                                 }
                               >
-                                <RefreshCw className="h-4 w-4 mr-1" />
-                                Status
+                                <RefreshCw className="mr-1 h-4 w-4" /> Status
                               </Button>
                               <Button
                                 size="sm"

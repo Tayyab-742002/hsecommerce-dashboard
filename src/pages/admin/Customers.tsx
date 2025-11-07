@@ -117,17 +117,19 @@ export default function AdminCustomers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-primary/10 rounded-lg">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-primary/10 p-3">
             <Users className="h-8 w-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold">Customers</h1>
-            <p className="text-muted-foreground">Manage customer accounts</p>
+            <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage customer accounts
+            </p>
           </div>
         </div>
-        <Button onClick={handleAdd}>
+        <Button onClick={handleAdd} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Add Customer
         </Button>
@@ -312,7 +314,7 @@ export default function AdminCustomers() {
                           <td className="whitespace-nowrap">
                             {new Date(customer.created_at).toLocaleDateString()}
                           </td>
-                          <td >
+                          <td>
                             <div className="flex gap-2">
                               <Button
                                 size="sm"

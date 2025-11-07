@@ -4,7 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Package, Loader2 } from "lucide-react";
 
@@ -29,9 +35,9 @@ export default function Login() {
 
       // Fetch user role to determine redirect
       const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', data.user.id)
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id)
         .single();
 
       toast({
@@ -40,10 +46,13 @@ export default function Login() {
       });
 
       // Redirect based on role
-      if (roleData?.role === 'customer_admin' || roleData?.role === 'customer_user') {
-        navigate('/customer/dashboard');
+      if (
+        roleData?.role === "customer_admin" ||
+        roleData?.role === "customer_user"
+      ) {
+        navigate("/customer/dashboard");
       } else {
-        navigate('/admin/dashboard');
+        navigate("/admin/dashboard");
       }
     } catch (error: any) {
       toast({
@@ -61,14 +70,10 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary/10 rounded-lg">
-              <Package className="h-10 w-10 text-primary" />
-            </div>
+            <img src="/logo.png" alt="HSEcommerce" width={50} height={50} />
           </div>
           <CardTitle className="text-2xl font-bold">HSEcommerce</CardTitle>
-          <CardDescription>
-            3PL Warehouse Management System
-          </CardDescription>
+          <CardDescription>3PL Warehouse Management System</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">

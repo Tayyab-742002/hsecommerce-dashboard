@@ -103,19 +103,19 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="dashboard-loader">
-        <div className="loader-spinner"></div>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
       </div>
     );
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="space-y-8">
       {/* Header Section */}
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Dashboard</h1>
-          <p className="dashboard-subtitle">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
             Welcome to HSEcommerce Admin Portal
           </p>
         </div>
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
           size="sm"
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="refresh-button"
+          className="w-full sm:w-auto"
         >
           <RefreshCw
             className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
@@ -134,7 +134,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="kpi-grid">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KPICard
           title="Total Inventory"
           value={stats.totalInventory}
@@ -158,49 +158,56 @@ export default function AdminDashboard() {
       </div>
 
       {/* Recent Orders Section */}
-      <Card className="orders-card">
-        <CardHeader className="orders-card-header">
-          <CardTitle className="orders-card-title">Recent Orders</CardTitle>
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-xl font-semibold">Recent Orders</CardTitle>
         </CardHeader>
-        <CardContent className="orders-card-content">
+        <CardContent className="space-y-4">
           {recentOrders.length === 0 ? (
-            <div className="empty-state">
-              <Package className="empty-state-icon" />
-              <p className="empty-state-text">No recent orders found</p>
+            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center">
+              <Package className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                No recent orders found
+              </p>
             </div>
           ) : (
             <>
               {/* Mobile Cards View */}
-              <div className="orders-mobile">
+              <div className="space-y-3 sm:hidden">
                 {recentOrders.map((order) => (
-                  <div key={order.id} className="order-card-mobile">
-                    <div className="order-card-header-mobile">
+                  <div
+                    key={order.id}
+                    className="rounded-lg border border-border bg-card p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="order-number-mobile">
+                        <div className="text-sm font-semibold">
                           {order.order_number}
                         </div>
-                        <div className="order-customer-mobile">
+                        <div className="text-xs text-muted-foreground">
                           {getCustomerName(order)}
                         </div>
                       </div>
                       <StatusBadge status={order.status} />
                     </div>
-                    <div className="order-details-mobile">
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                       <div>
-                        <div className="order-label">Type</div>
-                        <div className="order-value capitalize">
-                          {order.order_type}
+                        <div className="text-xs uppercase text-muted-foreground">
+                          Type
                         </div>
+                        <div className="capitalize">{order.order_type}</div>
                       </div>
                       <div>
-                        <div className="order-label">Items</div>
-                        <div className="order-value">{order.total_items}</div>
+                        <div className="text-xs uppercase text-muted-foreground">
+                          Items
+                        </div>
+                        <div>{order.total_items}</div>
                       </div>
                       <div className="col-span-2">
-                        <div className="order-label">Requested</div>
-                        <div className="order-value">
-                          {formatDate(order.requested_date)}
+                        <div className="text-xs uppercase text-muted-foreground">
+                          Requested
                         </div>
+                        <div>{formatDate(order.requested_date)}</div>
                       </div>
                     </div>
                   </div>
@@ -208,43 +215,62 @@ export default function AdminDashboard() {
               </div>
 
               {/* Desktop Table View */}
-              <div className="orders-desktop">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Order Number</th>
-                      <th>Customer</th>
-                      <th>Type</th>
-                      <th>Status</th>
-                      <th>Requested Date</th>
-                      <th className="text-right">Items</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentOrders.map((order) => (
-                      <tr key={order.id}>
-                        <td className="font-semibold">{order.order_number}</td>
-                        <td className="max-w-[200px] truncate">
-                          {getCustomerName(order)}
-                        </td>
-                        <td>
-                          <span className="capitalize text-muted-foreground">
-                            {order.order_type}
-                          </span>
-                        </td>
-                        <td>
-                          <StatusBadge status={order.status} />
-                        </td>
-                        <td className="text-muted-foreground">
-                          {formatDate(order.requested_date)}
-                        </td>
-                        <td className="text-right font-medium">
-                          {order.total_items}
-                        </td>
+              <div className="hidden sm:block">
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                        <th className="px-3 py-3 text-left font-medium">
+                          Order Number
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Customer
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Type
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Status
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Requested Date
+                        </th>
+                        <th className="px-3 py-3 text-right font-medium">
+                          Items
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {recentOrders.map((order) => (
+                        <tr
+                          key={order.id}
+                          className="border-b border-border/60 last:border-b-0"
+                        >
+                          <td className="px-3 py-3 font-semibold">
+                            {order.order_number}
+                          </td>
+                          <td className="px-3 py-3 max-w-[220px] truncate">
+                            {getCustomerName(order)}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="capitalize text-muted-foreground">
+                              {order.order_type}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <StatusBadge status={order.status} />
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">
+                            {formatDate(order.requested_date)}
+                          </td>
+                          <td className="px-3 py-3 text-right font-medium">
+                            {order.total_items}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           )}

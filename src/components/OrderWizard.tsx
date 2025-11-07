@@ -233,7 +233,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       </TabsList>
 
       <TabsContent value="1" className="space-y-4 mt-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Customer *</Label>
             <Select
@@ -330,7 +330,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           <Card>
             <CardContent className="pt-6">
               <h3 className="font-semibold mb-4">Delivery Information</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Contact Name</Label>
                   <Input
@@ -355,7 +355,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                     }
                   />
                 </div>
-                <div className="space-y-2 col-span-2">
+                <div className="space-y-2 sm:col-span-2">
                   <Label>Address</Label>
                   <Input
                     value={orderData.delivery_address_line1}
@@ -396,10 +396,11 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           </Card>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button
             onClick={() => setStep("2")}
             disabled={!orderData.customer_id || !orderData.warehouse_id}
+            className="w-full sm:w-auto"
           >
             Next: Add Items
           </Button>
@@ -411,7 +412,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           {orderItems.map((item, index) => (
             <Card key={index}>
               <CardContent className="pt-6">
-                <div className="flex gap-4 items-start">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start">
                   <div className="flex-1 space-y-2">
                     <Label>Item</Label>
                     <Select
@@ -433,7 +434,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="w-32 space-y-2">
+                  <div className="w-full space-y-2 md:w-32">
                     <Label>Quantity</Label>
                     <Input
                       type="number"
@@ -452,7 +453,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="mt-8"
+                    className="md:mt-8"
                     onClick={() => removeOrderItem(index)}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -468,13 +469,15 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           Add Item
         </Button>
 
-        <div className="flex justify-between">
-          <Button variant="outline" onClick={() => setStep("1")}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+          <Button variant="outline" onClick={() => setStep("1")}
+            className="w-full sm:w-auto">
             Back
           </Button>
           <Button
             onClick={() => setStep("3")}
             disabled={orderItems.length === 0}
+            className="w-full sm:w-auto"
           >
             Next: Review
           </Button>
@@ -484,7 +487,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       <TabsContent value="3" className="space-y-4 mt-4">
         <Card>
           <CardContent className="pt-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Handling Charges (USD)</Label>
                 <Input
@@ -556,11 +559,11 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           </CardContent>
         </Card>
 
-        <div className="flex justify-between">
-          <Button variant="outline" onClick={() => setStep("2")}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+          <Button variant="outline" onClick={() => setStep("2")} className="w-full sm:w-auto">
             Back
           </Button>
-          <Button onClick={handleSubmit}>Create Order</Button>
+          <Button onClick={handleSubmit} className="w-full sm:w-auto">Create Order</Button>
         </div>
       </TabsContent>
     </Tabs>

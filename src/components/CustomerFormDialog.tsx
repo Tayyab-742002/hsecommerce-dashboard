@@ -239,7 +239,7 @@ export default function CustomerFormDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="customer_code">Customer Code *</Label>
               <Input
@@ -292,7 +292,7 @@ export default function CustomerFormDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="contact_person">Contact Person *</Label>
               <Input
@@ -328,7 +328,7 @@ export default function CustomerFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="phone">Phone *</Label>
               <Input
@@ -379,7 +379,7 @@ export default function CustomerFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <Label htmlFor="city">City</Label>
               <Input
@@ -412,7 +412,7 @@ export default function CustomerFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="country">Country</Label>
               <Input
@@ -448,7 +448,7 @@ export default function CustomerFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="credit_limit">Credit Limit (USD)</Label>
               <Input
@@ -564,7 +564,7 @@ export default function CustomerFormDialog({
             </div>
           )}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"

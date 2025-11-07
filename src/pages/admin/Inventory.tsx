@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,11 +57,7 @@ export default function AdminInventory() {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
 
-  useEffect(() => {
-    fetchInventory();
-  }, []);
-
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     try {
       const customerId = searchParams.get("customer");
       let query = supabase.from("inventory_items").select(`
@@ -85,7 +81,11 @@ export default function AdminInventory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchParams]);
+
+  useEffect(() => {
+    fetchInventory();
+  }, [fetchInventory]);
 
   const filteredItems = items.filter(
     (item) =>
@@ -132,39 +132,40 @@ export default function AdminInventory() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Inventory Management</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">
+            Inventory Management
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Manage all warehouse inventory items
           </p>
         </div>
-        <Button onClick={handleAdd}>
+        <Button onClick={handleAdd} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Add Item
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Inventory Items</CardTitle>
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-xl font-semibold">
+            All Inventory Items
+          </CardTitle>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 transform h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by item code, name, or customer..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by item code, name, or customer..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 focus:border-none"
-              />
-            </div>
-          </div>
-
           <>
             {/* Mobile cards */}
-            <div className="md:hidden space-y-3">
+            <div className="space-y-3 sm:hidden">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Spinner label="Loading inventory" />
@@ -177,7 +178,7 @@ export default function AdminInventory() {
                 filteredItems.map((item) => (
                   <div
                     key={item.id}
-                    className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
+                    className="rounded-lg border border-border bg-card p-3 shadow-sm"
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-semibold">
@@ -261,32 +262,46 @@ export default function AdminInventory() {
             </div>
 
             {/* Desktop table */}
-            <div className="hidden md:block w-full overflow-x-auto">
-              <div className="table-container min-w-[920px] pr-4">
-                <table className="data-table">
+            <div className="hidden sm:block">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr>
-                      <th>Item Code</th>
-                      <th>Item Name</th>
-                      {/* <th>SKU</th> */}
-                      <th>Category</th>
-                      <th>Customer</th>
-                      {/* <th>Warehouse</th> */}
-                      <th>Quantity</th>
-                      {/* <th>UoM</th> */}
-                      <th>Weight</th>
-                      {/* <th>Dimensions</th> */}
-                      <th>Status</th>
-                      <th>Received Date</th>
-                      <th>Actions</th>
+                    <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                      <th className="px-3 py-3 text-left font-medium">
+                        Item Code
+                      </th>
+                      <th className="px-3 py-3 text-left font-medium">
+                        Item Name
+                      </th>
+                      <th className="px-3 py-3 text-left font-medium">
+                        Category
+                      </th>
+                      <th className="px-3 py-3 text-left font-medium">
+                        Customer
+                      </th>
+                      <th className="px-3 py-3 text-left font-medium">
+                        Quantity
+                      </th>
+                      <th className="px-3 py-3 text-left font-medium">
+                        Weight
+                      </th>
+                      <th className="px-3 py-3 text-left font-medium">
+                        Status
+                      </th>
+                      <th className="px-3 py-3 text-left font-medium">
+                        Received Date
+                      </th>
+                      <th className="px-3 py-3 text-left font-medium">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
                       <tr>
                         <td
-                          colSpan={13}
-                          className="text-center py-8 text-muted-foreground"
+                          colSpan={9}
+                          className="px-3 py-8 text-center text-muted-foreground"
                         >
                           Loading inventory...
                         </td>
@@ -294,61 +309,46 @@ export default function AdminInventory() {
                     ) : filteredItems.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={13}
-                          className="text-center py-8 text-muted-foreground"
+                          colSpan={9}
+                          className="px-3 py-8 text-center text-muted-foreground"
                         >
                           No items found
                         </td>
                       </tr>
                     ) : (
                       filteredItems.map((item) => (
-                        <tr key={item.id}>
-                          <td className="font-medium whitespace-nowrap">
+                        <tr
+                          key={item.id}
+                          className="border-b border-border/60 last:border-b-0"
+                        >
+                          <td className="px-3 py-3 font-medium whitespace-nowrap">
                             {item.item_code}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {item.item_name}
                           </td>
-                          {/* <td className="whitespace-nowrap">
-                            {item.sku || "-"}
-                          </td> */}
-                          <td className="capitalize whitespace-nowrap">
+                          <td className="px-3 py-3 capitalize whitespace-nowrap">
                             {item.category || "-"}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {item.customers?.company_name ||
                               item.customers?.contact_person}
                           </td>
-                          {/* <td className="whitespace-nowrap">
-                            {item.warehouses?.warehouse_name}
-                          </td> */}
-                          <td className="whitespace-nowrap">{item.quantity}</td>
-                          <td className="whitespace-nowrap">
-                            {item.unit_of_measure || "pcs"}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {item.quantity}
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {item.weight
                               ? `${item.weight} ${item.weight_unit || "kg"}`
                               : "-"}
                           </td>
-                          {/* <td className="whitespace-nowrap">
-                            {item.dimension_length &&
-                            item.dimension_width &&
-                            item.dimension_height
-                              ? `${item.dimension_length}×${
-                                  item.dimension_width
-                                }×${item.dimension_height} ${
-                                  item.dimension_unit || "cm"
-                                }`
-                              : "-"}
-                          </td> */}
-                          <td>
+                          <td className="px-3 py-3 whitespace-nowrap">
                             <StatusBadge status={item.status} />
                           </td>
-                          <td className="whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {new Date(item.received_date).toLocaleDateString()}
                           </td>
-                          <td>
+                          <td className="px-3 py-3">
                             <div className="flex gap-2">
                               <Button
                                 size="sm"

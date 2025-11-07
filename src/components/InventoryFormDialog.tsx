@@ -270,7 +270,7 @@ export default function InventoryFormDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="item_code">Item Code *</Label>
               <Input
@@ -319,7 +319,7 @@ export default function InventoryFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="category">Category</Label>
               <Input
@@ -359,7 +359,7 @@ export default function InventoryFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="warehouse_id">Warehouse *</Label>
               <Select
@@ -400,7 +400,7 @@ export default function InventoryFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <Label htmlFor="quantity">Quantity *</Label>
               <Input
@@ -462,7 +462,7 @@ export default function InventoryFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="weight">Weight</Label>
               <Input
@@ -502,7 +502,7 @@ export default function InventoryFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <Label htmlFor="condition_on_arrival">Condition on Arrival</Label>
               <Select
@@ -562,7 +562,7 @@ export default function InventoryFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="barcode">Barcode</Label>
               <Input
@@ -601,7 +601,7 @@ export default function InventoryFormDialog({
             />
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
