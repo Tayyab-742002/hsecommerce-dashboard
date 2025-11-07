@@ -13,6 +13,7 @@ interface InventoryItem {
   sku?: string;
   category?: string;
   quantity: number;
+  total_quantity?: number;
   unit_of_measure?: string;
   weight?: number;
   weight_unit?: string;
@@ -124,7 +125,7 @@ export default function CustomerInventory() {
                       <div className="text-right">
                         {item.warehouses?.warehouse_name}
                       </div> */}
-                        {/* <div className="text-muted-foreground text-xs">SKU</div>
+                      {/* <div className="text-muted-foreground text-xs">SKU</div>
                         <div className="text-right">{item.sku || "-"}</div> */}
                       <div className="text-muted-foreground text-xs">
                         Category
@@ -134,7 +135,8 @@ export default function CustomerInventory() {
                       </div>
                       <div className="text-muted-foreground text-xs">Qty</div>
                       <div className="text-right">
-                        {item.quantity} {item.unit_of_measure || "pcs"}
+                        {item.quantity} / {item.total_quantity ?? item.quantity}{" "}
+                        {item.unit_of_measure || "pcs"}
                       </div>
                       {/* <div className="text-muted-foreground text-xs">
                         Weight
@@ -176,7 +178,7 @@ export default function CustomerInventory() {
                         {/* <th>SKU</th> */}
                         <th>Category</th>
                         {/* <th>Warehouse</th> */}
-                        <th>Quantity</th>
+                        <th>Quantity / Total</th>
                         {/* <th>UoM</th> */}
                         {/* <th>Weight</th> */}
                         {/* <th>Dimensions</th> */}
@@ -202,7 +204,10 @@ export default function CustomerInventory() {
                           {/* <td className="whitespace-nowrap">
                             {item.warehouses?.warehouse_name}
                           </td> */}
-                          <td className="whitespace-nowrap">{item.quantity}</td>
+                          <td className="whitespace-nowrap">
+                            {item.quantity} /{" "}
+                            {item.total_quantity ?? item.quantity}
+                          </td>
                           {/* <td className="whitespace-nowrap">
                             {item.unit_of_measure || "pcs"}
                           </td> */}

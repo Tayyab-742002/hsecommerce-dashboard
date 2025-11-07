@@ -31,6 +31,7 @@ interface InventoryItem {
   customer_id: string;
   warehouse_id: string;
   quantity: number;
+  total_quantity?: number;
   unit_of_measure?: string;
   weight?: number;
   weight_unit?: string;
@@ -68,6 +69,7 @@ export default function InventoryFormDialog({
     customer_id: "",
     warehouse_id: "",
     quantity: 1,
+    total_quantity: 1,
     unit_of_measure: "pcs",
     received_date: new Date().toISOString().split("T")[0],
     status: "in_stock",
@@ -96,6 +98,7 @@ export default function InventoryFormDialog({
         customer_id: item.customer_id || "",
         warehouse_id: item.warehouse_id || "",
         quantity: item.quantity || 1,
+        total_quantity: item.total_quantity || item.quantity || 1,
         unit_of_measure: item.unit_of_measure || "pcs",
         received_date:
           item.received_date || new Date().toISOString().split("T")[0],
@@ -112,6 +115,7 @@ export default function InventoryFormDialog({
         customer_id: "",
         warehouse_id: "",
         quantity: 1,
+        total_quantity: 1,
         unit_of_measure: "pcs",
         received_date: new Date().toISOString().split("T")[0],
         status: "in_stock",
@@ -122,23 +126,32 @@ export default function InventoryFormDialog({
 
   type StatusType = "in_stock" | "reserved" | "shipped" | "damaged";
 
-  const schema = z.object({
-    item_code: z.string().min(1, "Item code is required"),
-    item_name: z.string().min(1, "Item name is required"),
-    description: z.string().optional(),
-    category: z.string().optional(),
-    customer_id: z.string().min(1, "Customer is required"),
-    warehouse_id: z.string().min(1, "Warehouse is required"),
-    quantity: z.number().int().min(1, "Quantity must be at least 1"),
-    unit_of_measure: z.string().optional(),
-    received_date: z.string().min(1, "Received date is required"),
-    storage_rate: z
-      .number()
-      .nonnegative({ message: "Storage rate must be >= 0" })
-      .optional(),
-    status: z.enum(["in_stock", "reserved", "shipped", "damaged"]).optional(),
-    notes: z.string().optional(),
-  });
+  const schema = z
+    .object({
+      item_code: z.string().min(1, "Item code is required"),
+      item_name: z.string().min(1, "Item name is required"),
+      description: z.string().optional(),
+      category: z.string().optional(),
+      customer_id: z.string().min(1, "Customer is required"),
+      warehouse_id: z.string().min(1, "Warehouse is required"),
+      quantity: z.number().int().min(0, "Quantity must be >= 0"),
+      total_quantity: z
+        .number()
+        .int()
+        .min(1, "Total quantity must be at least 1"),
+      unit_of_measure: z.string().optional(),
+      received_date: z.string().min(1, "Received date is required"),
+      storage_rate: z
+        .number()
+        .nonnegative({ message: "Storage rate must be >= 0" })
+        .optional(),
+      status: z.enum(["in_stock", "reserved", "shipped", "damaged"]).optional(),
+      notes: z.string().optional(),
+    })
+    .refine((data) => data.quantity <= data.total_quantity, {
+      message: "Available quantity cannot exceed total quantity",
+      path: ["quantity"],
+    });
 
   useEffect(() => {
     fetchCustomers();
@@ -177,6 +190,9 @@ export default function InventoryFormDialog({
         customer_id: formData.customer_id,
         warehouse_id: formData.warehouse_id,
         quantity: Number(formData.quantity),
+        total_quantity: Number(
+          formData.total_quantity || formData.quantity || 1
+        ),
         unit_of_measure: formData.unit_of_measure,
         received_date: formData.received_date,
         storage_rate:
@@ -211,6 +227,7 @@ export default function InventoryFormDialog({
         customer_id: formData.customer_id,
         warehouse_id: formData.warehouse_id,
         quantity: Number(formData.quantity),
+        total_quantity: Number(formData.total_quantity || formData.quantity),
         unit_of_measure: formData.unit_of_measure ?? null,
         received_date: formData.received_date,
         storage_rate:
@@ -392,7 +409,31 @@ export default function InventoryFormDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="quantity">Quantity *</Label>
+              <Label htmlFor="total_quantity">Total Quantity *</Label>
+              <Input
+                id="total_quantity"
+                type="number"
+                value={formData.total_quantity || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    total_quantity: parseInt(e.target.value) || 1,
+                  })
+                }
+                required
+                min="1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Total quantity received
+              </p>
+              {formErrors.total_quantity && (
+                <p className="text-sm text-destructive mt-1">
+                  {formErrors.total_quantity}
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="quantity">Available Quantity *</Label>
               <Input
                 id="quantity"
                 type="number"
@@ -404,14 +445,20 @@ export default function InventoryFormDialog({
                   })
                 }
                 required
-                min="1"
+                min="0"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Currently available quantity
+              </p>
               {formErrors.quantity && (
                 <p className="text-sm text-destructive mt-1">
                   {formErrors.quantity}
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="unit_of_measure">Unit</Label>
               <Select

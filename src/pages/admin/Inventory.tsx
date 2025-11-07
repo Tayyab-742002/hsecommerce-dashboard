@@ -29,6 +29,7 @@ interface InventoryItem {
   customer_id: string;
   warehouse_id: string;
   quantity: number;
+  total_quantity?: number;
   unit_of_measure?: string;
   weight?: number;
   weight_unit?: string;
@@ -209,7 +210,8 @@ export default function AdminInventory() {
                       </div>
                       <div className="text-muted-foreground text-xs">Qty</div>
                       <div className="text-right">
-                        {item.quantity} {item.unit_of_measure || "pcs"}
+                        {item.quantity} / {item.total_quantity ?? item.quantity}{" "}
+                        {item.unit_of_measure || "pcs"}
                       </div>
                       {/* <div className="text-muted-foreground text-xs">
                         Weight
@@ -279,7 +281,7 @@ export default function AdminInventory() {
                         Customer
                       </th>
                       <th className="px-3 py-3 text-left font-medium">
-                        Quantity
+                        Quantity / Total
                       </th>
                       {/* <th className="px-3 py-3 text-left font-medium">
                         Weight
@@ -334,7 +336,8 @@ export default function AdminInventory() {
                               item.customers?.contact_person}
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap">
-                            {item.quantity}
+                            {item.quantity} /{" "}
+                            {item.total_quantity ?? item.quantity}
                           </td>
                           {/* <td className="px-3 py-3 whitespace-nowrap">
                             {item.weight
