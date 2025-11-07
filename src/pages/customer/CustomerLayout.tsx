@@ -55,7 +55,12 @@ export default function CustomerLayout() {
         <div className="container mx-auto px-4 py-3.5 flex items-center justify-between max-w-7xl">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-primary/10 rounded-xl shadow-sm">
-              <img src="/logo.png" alt="H&S E-commerce" width={50} height={50} />
+              <img
+                src="/logo.png"
+                alt="H&S E-commerce"
+                width={50}
+                height={50}
+              />
             </div>
             <h1 className="text-lg font-bold tracking-tight">H&S E-commerce</h1>
           </div>
