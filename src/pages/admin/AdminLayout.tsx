@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   Menu,
+  User,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -93,7 +94,18 @@ export default function AdminLayout() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-sidebar-border">
+        <div className="p-3 border-t border-sidebar-border space-y-2">
+          {/* User Email Display */}
+          {user?.email && (
+            <div className="px-3 py-2 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/50 mb-2">
+              <div className="flex items-center gap-2 text-sidebar-foreground/90">
+                <User className="h-4 w-4 flex-shrink-0" />
+                <span className="text-xs font-medium truncate" title={user.email}>
+                  {user.email}
+                </span>
+              </div>
+            </div>
+          )}
           <Button
             variant="ghost"
             className="w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-all duration-200 rounded-xl"
@@ -162,7 +174,18 @@ export default function AdminLayout() {
             ))}
           </nav>
 
-          <div className="p-3 border-t border-sidebar-border">
+          <div className="p-3 border-t border-sidebar-border space-y-2">
+            {/* User Email Display */}
+            {user?.email && (
+              <div className="px-3 py-2 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/50 mb-2">
+                <div className="flex items-center gap-2 text-sidebar-foreground/90">
+                  <User className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-xs font-medium truncate" title={user.email}>
+                    {user.email}
+                  </span>
+                </div>
+              </div>
+            )}
             <Button
               variant="ghost"
               className="w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-all duration-200 rounded-xl"
