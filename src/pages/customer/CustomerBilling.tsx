@@ -25,13 +25,17 @@ export default function CustomerBilling() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: userRole } = await supabase
+    const { data: userRole, error: roleError } = await supabase
       .from("user_roles")
       .select("customer_id")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (!userRole?.customer_id) return;
+    // If no role found or no customer_id, user cannot access customer billing
+    if (roleError || !userRole?.customer_id) {
+      setLoading(false);
+      return;
+    }
 
     // Fetch all orders for this customer
     const { data: orders } = await supabase

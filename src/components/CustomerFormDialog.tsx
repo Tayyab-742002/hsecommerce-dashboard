@@ -186,6 +186,15 @@ export default function CustomerFormDialog({
         if (error) throw error;
         toast.success("Customer updated successfully");
       } else {
+        // Verify user session before attempting insert
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+        if (userError || !user) {
+          throw new Error("Authentication error: Please log in again");
+        }
+
         // Create customer record
         const { data: newCustomer, error: customerError } = await supabase
           .from("customers")
@@ -193,61 +202,63 @@ export default function CustomerFormDialog({
           .select()
           .single();
 
-        if (customerError) throw customerError;
+        if (customerError) {
+          console.error("Customer insert error:", customerError);
+          // Provide more helpful error message
+          if (
+            customerError.code === "42501" ||
+            customerError.message?.includes("row-level security")
+          ) {
+            throw new Error(
+              "Permission denied: You don't have permission to create customers. Please ensure your account has the correct role assigned."
+            );
+          }
+          throw customerError;
+        }
 
         // If admin wants to create login credentials
         if (createLogin && password) {
-          // Create auth user
-          const { data: authData, error: authError } =
-            await supabase.auth.signUp({
-              email: formData.email,
-              password: password,
-              options: {
-                emailRedirectTo: `${window.location.origin}/customer/dashboard`,
-                data: {
-                  first_name: formData.contact_person.split(" ")[0],
-                  last_name:
-                    formData.contact_person.split(" ").slice(1).join(" ") || "",
-                },
+          // Use Edge Function to create user (server-side, doesn't log in the new user)
+          // This is the CORRECT way - uses Admin API server-side
+          const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          if (!session) {
+            throw new Error(
+              "You must be logged in to create customer accounts"
+            );
+          }
+
+          // Call Edge Function to create user account using Supabase client
+          // This uses Admin API server-side, so no session is created for the new user
+          // Using supabase.functions.invoke() handles CORS automatically
+          const { data: result, error: functionError } =
+            await supabase.functions.invoke("create-customer-user", {
+              body: {
+                email: formData.email,
+                password: password,
+                customerId: newCustomer.id,
+                role: userRole,
+                firstName: formData.contact_person.split(" ")[0],
+                lastName:
+                  formData.contact_person.split(" ").slice(1).join(" ") || "",
+                phone: formData.phone,
               },
             });
 
-          if (authError) throw authError;
-
-          if (authData.user) {
-            // Create or update profile if it already exists (avoid duplicate PK errors)
-            const { error: profileError } = await supabase
-              .from("profiles")
-              .upsert(
-                {
-                  id: authData.user.id,
-                  first_name: formData.contact_person.split(" ")[0],
-                  last_name:
-                    formData.contact_person.split(" ").slice(1).join(" ") || "",
-                  email: formData.email,
-                  phone: formData.phone,
-                  customer_id: newCustomer.id,
-                },
-                { onConflict: "id" }
-              );
-
-            if (profileError) throw profileError;
-
-            // Assign role
-            const { error: roleError } = await supabase
-              .from("user_roles")
-              .insert({
-                user_id: authData.user.id,
-                role: userRole,
-                customer_id: newCustomer.id,
-              });
-
-            if (roleError) throw roleError;
-
-            toast.success(
-              "Customer and login credentials created successfully"
+          if (functionError) {
+            throw new Error(
+              functionError.message || "Failed to create customer account"
             );
           }
+
+          if (result?.error) {
+            throw new Error(result.error);
+          }
+
+          toast.success("Customer and login credentials created successfully");
         } else {
           toast.success("Customer created successfully");
         }

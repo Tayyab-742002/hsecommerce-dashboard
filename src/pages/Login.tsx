@@ -29,22 +29,36 @@ export default function Login() {
 
     const redirectBasedOnRole = async (userId: string) => {
       try {
-        const { data: roleData } = await supabase
+        const { data: roleData, error } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
 
         if (!mounted) return;
 
+        // Handle error - if no role found (PGRST116), default to admin
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error fetching user role:", error);
+          if (mounted) {
+            setCheckingSession(false);
+          }
+          return;
+        }
+
+        // If no role found (null) or role is admin/warehouse, redirect to admin
+        // Otherwise, redirect to customer dashboard
         if (roleData?.role === "customer_admin" || roleData?.role === "customer_user") {
           navigate("/customer/dashboard", { replace: true });
         } else {
+          // Default to admin dashboard if no role or admin role
           navigate("/admin/dashboard", { replace: true });
         }
       } catch (error) {
         console.error("Error fetching user role:", error);
+        // On error, default to admin dashboard
         if (mounted) {
+          navigate("/admin/dashboard", { replace: true });
           setCheckingSession(false);
         }
       }
@@ -105,24 +119,31 @@ export default function Login() {
       if (error) throw error;
 
       // Fetch user role to determine redirect
-      const { data: roleData } = await supabase
+      const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", data.user.id)
-        .single();
+        .maybeSingle();
+
+      // Handle error - if no role found (PGRST116), default to admin
+      if (roleError && roleError.code !== 'PGRST116') {
+        console.error("Error fetching user role:", roleError);
+        // Continue anyway - default to admin
+      }
 
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
 
-      // Redirect based on role
+      // Redirect based on role - default to admin if no role found
       if (
         roleData?.role === "customer_admin" ||
         roleData?.role === "customer_user"
       ) {
         navigate("/customer/dashboard");
       } else {
+        // Default to admin dashboard if no role or admin role
         navigate("/admin/dashboard");
       }
     } catch (error: any) {
