@@ -23,7 +23,7 @@ interface OrderWizardProps {
 
 interface OrderItem {
   inventory_item_id: string;
-  quantity: number;
+  quantity?: number;
   item_name: string;
   available_quantity: number;
 }
@@ -35,7 +35,15 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
 
-  const [orderData, setOrderData] = useState({
+  const [orderData, setOrderData] = useState<{
+    customer_id: string;
+    warehouse_id: string;
+    order_type: string;
+    requested_date: string;
+    special_instructions: string;
+    pick_and_pack_rate?: number;
+    delivery_charges: number;
+  }>({
     customer_id: "",
     warehouse_id: "",
     order_type: "delivery",
@@ -129,7 +137,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
 
     // Validate quantities
     const invalidItem = orderItems.find(
-      (item) => item.quantity > item.available_quantity
+      (item) => (item.quantity ?? 0) > item.available_quantity || !item.quantity || item.quantity < 1
     );
     if (invalidItem) {
       toast({
@@ -141,11 +149,12 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
     }
 
     const totalQuantity = orderItems.reduce(
-      (sum, item) => sum + item.quantity,
+      (sum, item) => sum + (item.quantity ?? 0),
       0
     );
     // Calculate total charges: rate per quantity × total quantity
-    const totalCharges = Number(orderData.pick_and_pack_rate) * totalQuantity;
+    const pickAndPackRate = orderData.pick_and_pack_rate ?? 0;
+    const totalCharges = pickAndPackRate * totalQuantity;
 
     // Generate order number
     const orderNumber = `OUT-${new Date().getFullYear()}-${String(
@@ -187,7 +196,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
         orderItems.map((item) => ({
           outbound_order_id: order.id,
           inventory_item_id: item.inventory_item_id,
-          quantity: item.quantity,
+          quantity: item.quantity ?? 1,
           order_item: item.item_name, // Store item_name at time of order creation
         }))
       );
@@ -350,14 +359,21 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                       type="number"
                       min="1"
                       max={item.available_quantity}
-                      value={item.quantity}
-                      onChange={(e) =>
+                      value={item.quantity ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
                         updateOrderItem(
                           index,
                           "quantity",
-                          parseInt(e.target.value) || 1
-                        )
-                      }
+                          value === "" ? undefined : (parseInt(value) || 0)
+                        );
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        if (value === "" || parseInt(value) < 1) {
+                          updateOrderItem(index, "quantity", 1);
+                        }
+                      }}
                     />
                   </div>
                   <Button
@@ -406,17 +422,39 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                 <Input
                   type="number"
                   step="0.01"
-                  min="0"
-                  value={orderData.pick_and_pack_rate}
-                  onChange={(e) =>
-                    setOrderData({
-                      ...orderData,
-                      pick_and_pack_rate: parseFloat(e.target.value) || 0,
-                    })
-                  }
+                  value={orderData.pick_and_pack_rate ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow empty string for clearing the field
+                    if (value === "") {
+                      setOrderData({
+                        ...orderData,
+                        pick_and_pack_rate: undefined,
+                      });
+                    } else {
+                      // Parse the number (handles both positive and negative numbers)
+                      const numValue = parseFloat(value);
+                      if (!isNaN(numValue)) {
+                        setOrderData({
+                          ...orderData,
+                          pick_and_pack_rate: numValue,
+                        });
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value;
+                    // If empty, set to 0 on blur
+                    if (value === "") {
+                      setOrderData({
+                        ...orderData,
+                        pick_and_pack_rate: 0,
+                      });
+                    }
+                  }}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Charge per unit of quantity (e.g., 0.15 per item)
+                  Charge per unit of quantity (e.g., 0.15, -7.5, -3.35)
                 </p>
               </div>
               <div className="space-y-2">
@@ -424,7 +462,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                 <Input
                   type="number"
                   value={orderItems.reduce(
-                    (sum, item) => sum + item.quantity,
+                    (sum, item) => sum + (item.quantity ?? 0),
                     0
                   )}
                   disabled
@@ -457,21 +495,21 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                 <div className="flex justify-between">
                   <span>Total Quantity:</span>
                   <span className="font-medium">
-                    {orderItems.reduce((sum, item) => sum + item.quantity, 0)}
+                    {orderItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Pick and Pack Rate:</span>
                   <span className="font-medium">
-                    {formatCurrency(orderData.pick_and_pack_rate)} per quantity
+                    {formatCurrency(orderData.pick_and_pack_rate ?? 0)} per quantity
                   </span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
                   <span>Total Charges:</span>
                   <span>
                     {formatCurrency(
-                      orderData.pick_and_pack_rate *
-                        orderItems.reduce((sum, item) => sum + item.quantity, 0)
+                      (orderData.pick_and_pack_rate ?? 0) *
+                        orderItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
                     )}
                   </span>
                 </div>

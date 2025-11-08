@@ -13,7 +13,23 @@ export default function ReceiveInventory() {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    customer_id: string;
+    warehouse_id: string;
+    item_code: string;
+    item_name: string;
+    description: string;
+    category: string;
+    quantity?: number;
+    weight: string;
+    dimension_length: string;
+    dimension_width: string;
+    dimension_height: string;
+    declared_value: string;
+    received_date: string;
+    condition_on_arrival: string;
+    notes: string;
+  }>({
     customer_id: "",
     warehouse_id: "",
     item_code: "",
@@ -59,6 +75,7 @@ export default function ReceiveInventory() {
       .from('inventory_items')
       .insert({
         ...formData,
+        quantity: formData.quantity ?? 1,
         weight: formData.weight ? parseFloat(formData.weight) : null,
         dimension_length: formData.dimension_length ? parseFloat(formData.dimension_length) : null,
         dimension_width: formData.dimension_width ? parseFloat(formData.dimension_width) : null,
@@ -192,8 +209,23 @@ export default function ReceiveInventory() {
                 <Input
                   type="number"
                   min="1"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({...formData, quantity: parseInt(e.target.value) || 1})}
+                  value={formData.quantity ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData({
+                      ...formData,
+                      quantity: value === "" ? undefined : (parseInt(value) || 0),
+                    });
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value;
+                    if (value === "" || parseInt(value) < 1) {
+                      setFormData({
+                        ...formData,
+                        quantity: 1,
+                      });
+                    }
+                  }}
                   required
                 />
               </div>
@@ -218,6 +250,11 @@ export default function ReceiveInventory() {
                     step="0.01"
                     value={formData.weight}
                     onChange={(e) => setFormData({...formData, weight: e.target.value})}
+                    onBlur={(e) => {
+                      if (e.target.value === "") {
+                        setFormData({...formData, weight: ""});
+                      }
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -227,6 +264,11 @@ export default function ReceiveInventory() {
                     step="0.01"
                     value={formData.dimension_length}
                     onChange={(e) => setFormData({...formData, dimension_length: e.target.value})}
+                    onBlur={(e) => {
+                      if (e.target.value === "") {
+                        setFormData({...formData, dimension_length: ""});
+                      }
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -236,6 +278,11 @@ export default function ReceiveInventory() {
                     step="0.01"
                     value={formData.dimension_width}
                     onChange={(e) => setFormData({...formData, dimension_width: e.target.value})}
+                    onBlur={(e) => {
+                      if (e.target.value === "") {
+                        setFormData({...formData, dimension_width: ""});
+                      }
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -245,6 +292,11 @@ export default function ReceiveInventory() {
                     step="0.01"
                     value={formData.dimension_height}
                     onChange={(e) => setFormData({...formData, dimension_height: e.target.value})}
+                    onBlur={(e) => {
+                      if (e.target.value === "") {
+                        setFormData({...formData, dimension_height: ""});
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -285,6 +337,11 @@ export default function ReceiveInventory() {
                     step="0.01"
                     value={formData.declared_value}
                     onChange={(e) => setFormData({...formData, declared_value: e.target.value})}
+                    onBlur={(e) => {
+                      if (e.target.value === "") {
+                        setFormData({...formData, declared_value: ""});
+                      }
+                    }}
                   />
                 </div>
               </div>

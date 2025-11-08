@@ -151,9 +151,9 @@ export default function CustomerBilling() {
                       <tr>
                         <th>Order Number</th>
                         <th>Date</th>
-                        <th>Handling</th>
+                        <th>Total Charges</th>
                         {/* <th>Delivery</th> */}
-                        <th>Total</th>
+                        {/* <th>Total</th> */}
                       </tr>
                     </thead>
                     <tbody>
@@ -165,9 +165,9 @@ export default function CustomerBilling() {
                           <td className="whitespace-nowrap">
                             {new Date(charge.created_at).toLocaleDateString()}
                           </td>
-                          <td className="whitespace-nowrap">
+                          {/* <td className="whitespace-nowrap">
                             {formatCurrency(charge.handling_charges ?? 0)}
-                          </td>
+                          </td> */}
                           {/* <td className="whitespace-nowrap">{formatCurrency(charge.delivery_charges ?? 0)}</td> */}
                           <td className="font-bold whitespace-nowrap">
                             {formatCurrency(charge.total_charges ?? 0)}

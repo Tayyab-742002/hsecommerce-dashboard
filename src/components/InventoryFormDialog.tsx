@@ -74,6 +74,14 @@ export default function InventoryFormDialog({
     received_date: new Date().toISOString().split("T")[0],
     status: "in_stock",
   });
+
+  // Helper to ensure number values are valid before submission
+  const getNumberValue = (
+    value: number | undefined,
+    defaultValue: number = 0
+  ): number => {
+    return value ?? defaultValue;
+  };
   type CustomerOption = Pick<
     Tables<"customers">,
     "id" | "customer_code" | "company_name" | "contact_person"
@@ -181,7 +189,13 @@ export default function InventoryFormDialog({
     setLoading(true);
 
     try {
-      // Validate
+      // Validate - ensure numeric values are set
+      const quantityValue = getNumberValue(formData.quantity, 0);
+      const totalQuantityValue = getNumberValue(
+        formData.total_quantity,
+        quantityValue || 1
+      );
+
       const result = schema.safeParse({
         item_code: formData.item_code,
         item_name: formData.item_name,
@@ -189,18 +203,11 @@ export default function InventoryFormDialog({
         category: formData.category,
         customer_id: formData.customer_id,
         warehouse_id: formData.warehouse_id,
-        quantity: Number(formData.quantity),
-        total_quantity: Number(
-          formData.total_quantity || formData.quantity || 1
-        ),
+        quantity: quantityValue,
+        total_quantity: totalQuantityValue,
         unit_of_measure: formData.unit_of_measure,
         received_date: formData.received_date,
-        storage_rate:
-          typeof formData.storage_rate === "number"
-            ? formData.storage_rate
-            : formData.storage_rate
-            ? Number(formData.storage_rate)
-            : undefined,
+        storage_rate: formData.storage_rate,
         status: (formData.status || undefined) as StatusType | undefined,
         notes: formData.notes,
       });
@@ -226,14 +233,11 @@ export default function InventoryFormDialog({
         sku: null as unknown as string | null,
         customer_id: formData.customer_id,
         warehouse_id: formData.warehouse_id,
-        quantity: Number(formData.quantity),
-        total_quantity: Number(formData.total_quantity || formData.quantity),
+        quantity: quantityValue,
+        total_quantity: totalQuantityValue,
         unit_of_measure: formData.unit_of_measure ?? null,
         received_date: formData.received_date,
-        storage_rate:
-          typeof formData.storage_rate === "number"
-            ? formData.storage_rate
-            : null,
+        storage_rate: formData.storage_rate ?? null,
         status: formData.status ?? null,
         notes: formData.notes ?? null,
       };
@@ -413,13 +417,24 @@ export default function InventoryFormDialog({
               <Input
                 id="total_quantity"
                 type="number"
-                value={formData.total_quantity || ""}
-                onChange={(e) =>
+                value={formData.total_quantity ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
                   setFormData({
                     ...formData,
-                    total_quantity: parseInt(e.target.value) || 1,
-                  })
-                }
+                    total_quantity:
+                      value === "" ? undefined : parseInt(value) || 0,
+                  });
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || parseInt(value) < 1) {
+                    setFormData({
+                      ...formData,
+                      total_quantity: 1,
+                    });
+                  }
+                }}
                 required
                 min="1"
               />
@@ -437,13 +452,23 @@ export default function InventoryFormDialog({
               <Input
                 id="quantity"
                 type="number"
-                value={formData.quantity}
-                onChange={(e) =>
+                value={formData.quantity ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
                   setFormData({
                     ...formData,
-                    quantity: parseInt(e.target.value),
-                  })
-                }
+                    quantity: value === "" ? undefined : parseInt(value) || 0,
+                  });
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value;
+                  if (value === "") {
+                    setFormData({
+                      ...formData,
+                      quantity: 0,
+                    });
+                  }
+                }}
                 required
                 min="0"
               />
@@ -505,13 +530,25 @@ export default function InventoryFormDialog({
               <Input
                 id="storage_rate"
                 type="number"
-                value={formData.storage_rate || ""}
-                onChange={(e) =>
+                step="0.01"
+                value={formData.storage_rate ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
                   setFormData({
                     ...formData,
-                    storage_rate: parseFloat(e.target.value),
-                  })
-                }
+                    storage_rate:
+                      value === "" ? undefined : parseFloat(value) || 0,
+                  });
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value;
+                  if (value === "") {
+                    setFormData({
+                      ...formData,
+                      storage_rate: undefined,
+                    });
+                  }
+                }}
               />
             </div>
           </div>
