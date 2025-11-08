@@ -172,8 +172,6 @@ export default function AdminReports() {
           .sort((a, b) => b.value - a.value)
       );
 
-      // Calculate revenue by month (last 6 months)
-      const monthlyRevenue: RevenueData[] = [];
       const revenuePromises = [];
 
       for (let i = 5; i >= 0; i--) {
@@ -188,18 +186,21 @@ export default function AdminReports() {
             .select("total_charges")
             .gte("created_at", monthStart.toISOString())
             .lte("created_at", monthEnd.toISOString())
-            .then(({ data }) => ({
-              month: monthStart.toLocaleDateString("en-US", {
-                month: "short",
-                year: "2-digit",
-              }),
-              revenue:
-                data?.reduce(
-                  (sum, order) => sum + (order.total_charges || 0),
-                  0
-                ) || 0,
-              orders: data?.length || 0,
-            }))
+            .then(({ data }) => {
+              const revenue =
+                data?.reduce((sum, order) => {
+                  const charge = Number(order.total_charges) || 0;
+                  return sum + charge;
+                }, 0) || 0;
+              return {
+                month: monthStart.toLocaleDateString("en-US", {
+                  month: "short",
+                  year: "2-digit",
+                }),
+                revenue: Number(revenue),
+                orders: data?.length || 0,
+              };
+            })
         );
       }
 
@@ -228,12 +229,22 @@ export default function AdminReports() {
     }).format(value);
   };
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  interface TooltipProps {
+    active?: boolean;
+    payload?: Array<{
+      name: string;
+      value: number;
+      color: string;
+    }>;
+    label?: string;
+  }
+
+  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-card border border-border rounded-lg shadow-lg p-3">
           <p className="font-semibold text-sm mb-1">{label}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index: number) => (
             <p key={index} className="text-xs" style={{ color: entry.color }}>
               {entry.name}:{" "}
               {entry.name.includes("Revenue")
@@ -288,12 +299,12 @@ export default function AdminReports() {
       <div className="kpi-grid">
         <KPICard
           title="Total Revenue"
-          value={formatCurrency(stats.totalRevenue)}
+          value={`£${stats.totalRevenue.toLocaleString()}`}
           icon={DollarSign}
         />
         <KPICard
           title="Monthly Orders"
-          value={stats.monthlyOrders}
+          value={stats.monthlyOrders.toLocaleString()}
           icon={TrendingUp}
         />
         {/* <KPICard
@@ -303,7 +314,7 @@ export default function AdminReports() {
         /> */}
         <KPICard
           title="Active Customers"
-          value={stats.activeCustomers}
+          value={stats.activeCustomers.toLocaleString()}
           icon={Users}
         />
       </div>
@@ -347,7 +358,18 @@ export default function AdminReports() {
                 <YAxis
                   tick={{ fontSize: 12 }}
                   stroke="hsl(var(--muted-foreground))"
-                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                  tickFormatter={(value) => {
+                    if (value === 0) return "£0";
+                    if (value >= 1000000) {
+                      return `£${(value / 1000000).toFixed(1)}M`;
+                    } else if (value >= 1000) {
+                      return `£${(value / 1000).toFixed(0)}K`;
+                    } else {
+                      return `£${Math.round(value)}`;
+                    }
+                  }}
+                  domain={[0, "auto"]}
+                  allowDecimals={false}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: "12px" }} />
