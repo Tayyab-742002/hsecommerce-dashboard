@@ -1,7 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { KPICard } from "@/components/KPICard";
-import { Package, TrendingUp, Users, Warehouse, RefreshCw } from "lucide-react";
+import {
+  Package,
+  TrendingUp,
+  Users,
+  Warehouse,
+  RefreshCw,
+  Boxes,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +18,8 @@ interface DashboardStats {
   totalCustomers: number;
   pendingOrders: number;
   warehouseCapacity: number;
+  currentQuantity: number;
+  totalQuantity: number;
 }
 
 interface Order {
@@ -32,6 +41,8 @@ export default function AdminDashboard() {
     totalCustomers: 0,
     pendingOrders: 0,
     warehouseCapacity: 0,
+    currentQuantity: 0,
+    totalQuantity: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +59,7 @@ export default function AdminDashboard() {
         { count: pendingCount },
         { data: warehouse },
         { data: orders },
+        { data: inventoryItems },
       ] = await Promise.all([
         supabase
           .from("inventory_items")
@@ -63,13 +75,34 @@ export default function AdminDashboard() {
           .select("*, customers(company_name, contact_person)")
           .order("created_at", { ascending: false })
           .limit(5),
+        supabase.from("inventory_items").select("quantity, total_quantity"),
       ]);
+
+      // Calculate total current and total quantities
+      // Note: total_quantity may not be in TypeScript types yet, but exists in DB after migration
+      type InventoryItemWithTotal = {
+        quantity: number;
+        total_quantity?: number;
+      };
+      const items =
+        (inventoryItems as unknown as InventoryItemWithTotal[]) || [];
+
+      const currentQuantity = items.reduce(
+        (sum, item) => sum + (item.quantity || 0),
+        0
+      );
+      const totalQuantity = items.reduce(
+        (sum, item) => sum + (item.total_quantity || item.quantity || 0),
+        0
+      );
 
       setStats({
         totalInventory: inventoryCount || 0,
         totalCustomers: customerCount || 0,
         pendingOrders: pendingCount || 0,
         warehouseCapacity: warehouse?.total_capacity || 0,
+        currentQuantity,
+        totalQuantity,
       });
 
       setRecentOrders(orders || []);
@@ -145,11 +178,11 @@ export default function AdminDashboard() {
           value={stats.totalCustomers}
           icon={Users}
         />
-        {/* <KPICard
-          title="Pending Orders"
-          value={stats.pendingOrders}
-          icon={TrendingUp}
-        /> */}
+        <KPICard
+          title="Overall Quantities"
+          value={`${stats.currentQuantity.toLocaleString()} / ${stats.totalQuantity.toLocaleString()}`}
+          icon={Boxes}
+        />
         <KPICard
           title="Warehouse Capacity"
           value={`${stats.warehouseCapacity.toLocaleString()} sqft`}
