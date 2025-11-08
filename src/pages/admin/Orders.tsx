@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import OrderWizard from "@/components/OrderWizard";
 import OrderStatusDialog from "@/components/OrderStatusDialog";
+import OrderDetailsDialog from "@/components/OrderDetailsDialog";
 import { toast } from "sonner";
 import Spinner from "@/components/Spinner";
 import { formatCurrency } from "@/lib/currency";
@@ -67,6 +68,8 @@ export default function AdminOrders() {
   } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -100,9 +103,21 @@ export default function AdminOrders() {
         .includes(searchTerm.toLowerCase())
   );
 
-  const handleStatusChange = (orderId: string, currentStatus: string) => {
+  const handleStatusChange = (orderId: string, currentStatus: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setSelectedOrder({ id: orderId, status: currentStatus });
     setStatusDialogOpen(true);
+  };
+
+  const handleOrderClick = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setDetailsDialogOpen(true);
+  };
+
+  const handleDeleteClick = (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOrderToDelete(orderId);
+    setDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
@@ -192,7 +207,8 @@ export default function AdminOrders() {
                 {filteredOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="rounded-lg border border-border bg-card p-3 shadow-sm"
+                    className="rounded-lg border border-border bg-card p-3 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleOrderClick(order.id)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-semibold whitespace-nowrap">
@@ -247,12 +263,15 @@ export default function AdminOrders() {
                         {formatCurrency(order.total_charges ?? 0)}
                       </div>
                     </div>
-                    <div className="mt-3 flex justify-end gap-2">
+                    <div 
+                      className="mt-3 flex justify-end gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() =>
-                          handleStatusChange(order.id, order.status)
+                        onClick={(e) =>
+                          handleStatusChange(order.id, order.status, e)
                         }
                       >
                         <RefreshCw className="h-4 w-4 mr-1" /> Status
@@ -260,10 +279,7 @@ export default function AdminOrders() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => {
-                          setOrderToDelete(order.id);
-                          setDeleteDialogOpen(true);
-                        }}
+                        onClick={(e) => handleDeleteClick(order.id, e)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -326,7 +342,8 @@ export default function AdminOrders() {
                       {filteredOrders.map((order) => (
                         <tr
                           key={order.id}
-                          className="border-b border-border/60 last:border-b-0"
+                          className="border-b border-border/60 last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => handleOrderClick(order.id)}
                         >
                           <td className="px-3 py-3 font-medium whitespace-nowrap">
                             {order.outbound_order_items
@@ -387,13 +404,13 @@ export default function AdminOrders() {
                           {/* <td className="px-3 py-3 whitespace-nowrap">
                             {order.delivery_city || "-"}
                           </td> */}
-                          <td className="px-3 py-3">
+                          <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() =>
-                                  handleStatusChange(order.id, order.status)
+                                onClick={(e) =>
+                                  handleStatusChange(order.id, order.status, e)
                                 }
                               >
                                 <RefreshCw className="mr-1 h-4 w-4" /> Status
@@ -401,10 +418,7 @@ export default function AdminOrders() {
                               <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => {
-                                  setOrderToDelete(order.id);
-                                  setDeleteDialogOpen(true);
-                                }}
+                                onClick={(e) => handleDeleteClick(order.id, e)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -430,6 +444,13 @@ export default function AdminOrders() {
           onSuccess={fetchOrders}
         />
       )}
+
+      <OrderDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        orderId={selectedOrderId}
+        showCustomerInfo={true}
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

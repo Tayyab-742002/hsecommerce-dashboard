@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
+import OrderDetailsDialog from "@/components/OrderDetailsDialog";
 import Spinner from "@/components/Spinner";
 import { formatCurrency } from "@/lib/currency";
 import { Search } from "lucide-react";
@@ -35,6 +36,8 @@ export default function CustomerOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -76,6 +79,11 @@ export default function CustomerOrders() {
     order.order_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleOrderClick = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setDetailsDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       <div>
@@ -112,7 +120,8 @@ export default function CustomerOrders() {
                 {filteredOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
+                    className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleOrderClick(order.id)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-semibold">{order.order_number}</div>
@@ -188,7 +197,11 @@ export default function CustomerOrders() {
                     </thead>
                     <tbody>
                       {filteredOrders.map((order) => (
-                        <tr key={order.id}>
+                        <tr
+                          key={order.id}
+                          className="cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => handleOrderClick(order.id)}
+                        >
                           <td className="font-medium whitespace-nowrap">
                             {order.order_number}
                           </td>
@@ -254,6 +267,13 @@ export default function CustomerOrders() {
           )}
         </CardContent>
       </Card>
+
+      <OrderDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        orderId={selectedOrderId}
+        showCustomerInfo={false}
+      />
     </div>
   );
 }
