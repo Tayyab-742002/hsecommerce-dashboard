@@ -3,12 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
 export interface UserRole {
-  role:
-    | "super_admin"
-    | "warehouse_manager"
-    | "warehouse_staff"
-    | "customer_admin"
-    | "customer_user";
+  role: "super_admin" | "customer_admin";
   customer_id?: string;
 }
 
@@ -73,23 +68,14 @@ export function useAuth() {
   };
 
   const isAdmin = () => {
-    // If user has a role, check if it's an admin role
-    if (userRole?.role) {
-      return (
-        userRole.role === "super_admin" ||
-        userRole.role === "warehouse_manager" ||
-        userRole.role === "warehouse_staff"
-      );
-    }
-    // If user is authenticated but has no role entry, default to admin access for routing
-    // RLS policies at database level will still protect data
-    return user !== null;
+    // CRITICAL FIX: Only return true if user has explicit super_admin role
+    // Do NOT default to admin for users without a role
+    return userRole?.role === "super_admin";
   };
 
   const isCustomer = () => {
-    return (
-      userRole?.role === "customer_admin" || userRole?.role === "customer_user"
-    );
+    // Only return true if user has explicit customer_admin role
+    return userRole?.role === "customer_admin";
   };
 
   return { user, userRole, loading, isAdmin, isCustomer };

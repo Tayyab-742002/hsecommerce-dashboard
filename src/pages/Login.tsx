@@ -37,28 +37,62 @@ export default function Login() {
 
         if (!mounted) return;
 
-        // Handle error - if no role found (PGRST116), default to admin
+        // Handle error
         if (error && error.code !== 'PGRST116') {
           console.error("Error fetching user role:", error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch user role. Please try again.",
+            variant: "destructive",
+          });
           if (mounted) {
             setCheckingSession(false);
           }
           return;
         }
 
-        // If no role found (null) or role is admin/warehouse, redirect to admin
-        // Otherwise, redirect to customer dashboard
-        if (roleData?.role === "customer_admin" || roleData?.role === "customer_user") {
+        // CRITICAL FIX: Explicit role check - no defaulting
+        if (!roleData || !roleData.role) {
+          // No role found - sign out and show error
+          console.error("User has no role assigned:", userId);
+          await supabase.auth.signOut();
+          toast({
+            title: "Access Denied",
+            description: "Your account does not have a valid role assigned. Please contact support.",
+            variant: "destructive",
+          });
+          if (mounted) {
+            setCheckingSession(false);
+          }
+          return;
+        }
+
+        // Redirect based on explicit role
+        if (roleData.role === "customer_admin") {
           navigate("/customer/dashboard", { replace: true });
-        } else {
-          // Default to admin dashboard if no role or admin role
+        } else if (roleData.role === "super_admin") {
           navigate("/admin/dashboard", { replace: true });
+        } else {
+          // Unknown role - sign out
+          console.error("Unknown role:", roleData.role);
+          await supabase.auth.signOut();
+          toast({
+            title: "Access Denied",
+            description: "Your account has an invalid role. Please contact support.",
+            variant: "destructive",
+          });
+          if (mounted) {
+            setCheckingSession(false);
+          }
         }
       } catch (error) {
         console.error("Error fetching user role:", error);
-        // On error, default to admin dashboard
+        toast({
+          title: "Error",
+          description: "An error occurred during login. Please try again.",
+          variant: "destructive",
+        });
         if (mounted) {
-          navigate("/admin/dashboard", { replace: true });
           setCheckingSession(false);
         }
       }
@@ -125,10 +159,23 @@ export default function Login() {
         .eq("user_id", data.user.id)
         .maybeSingle();
 
-      // Handle error - if no role found (PGRST116), default to admin
+      // Handle error
       if (roleError && roleError.code !== 'PGRST116') {
         console.error("Error fetching user role:", roleError);
-        // Continue anyway - default to admin
+        throw new Error("Failed to fetch user role");
+      }
+
+      // CRITICAL FIX: Verify user has a valid role
+      if (!roleData || !roleData.role) {
+        // No role found - sign out and show error
+        await supabase.auth.signOut();
+        throw new Error("Your account does not have a valid role assigned. Please contact support.");
+      }
+
+      // Verify role is one of the expected values
+      if (roleData.role !== "super_admin" && roleData.role !== "customer_admin") {
+        await supabase.auth.signOut();
+        throw new Error("Your account has an invalid role. Please contact support.");
       }
 
       toast({
@@ -136,14 +183,10 @@ export default function Login() {
         description: "Welcome back!",
       });
 
-      // Redirect based on role - default to admin if no role found
-      if (
-        roleData?.role === "customer_admin" ||
-        roleData?.role === "customer_user"
-      ) {
+      // Redirect based on explicit role
+      if (roleData.role === "customer_admin") {
         navigate("/customer/dashboard");
-      } else {
-        // Default to admin dashboard if no role or admin role
+      } else if (roleData.role === "super_admin") {
         navigate("/admin/dashboard");
       }
     } catch (error: any) {

@@ -70,7 +70,7 @@ const customerSchema = z
     notes: z.string().optional(),
     createLogin: z.boolean().optional().default(false),
     password: z.string().optional(),
-    userRole: z.enum(["customer_admin", "customer_user"]).optional(),
+    userRole: z.enum(["customer_admin"]).optional(),
   })
   .superRefine((val, ctx) => {
     if (val.createLogin) {
@@ -103,8 +103,8 @@ export default function CustomerFormDialog({
   const [loading, setLoading] = useState(false);
   const [createLogin, setCreateLogin] = useState(false);
   const [password, setPassword] = useState("");
-  const [userRole, setUserRole] = useState<"customer_admin" | "customer_user">(
-    "customer_user"
+  const [userRole, setUserRole] = useState<"customer_admin">(
+    "customer_admin"
   );
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -129,7 +129,7 @@ export default function CustomerFormDialog({
       });
       setCreateLogin(false);
       setPassword("");
-      setUserRole("customer_user");
+      setUserRole("customer_admin");
       setFormErrors({});
     } else {
       // Reset form when adding new customer
@@ -145,7 +145,7 @@ export default function CustomerFormDialog({
       });
       setCreateLogin(false);
       setPassword("");
-      setUserRole("customer_user");
+      setUserRole("customer_admin");
       setFormErrors({});
     }
   }, [customer, open]);
@@ -280,7 +280,7 @@ export default function CustomerFormDialog({
         });
         setCreateLogin(false);
         setPassword("");
-        setUserRole("customer_user");
+        setUserRole("customer_admin");
       }
       setFormErrors({});
     } catch (error: unknown) {
@@ -553,7 +553,7 @@ export default function CustomerFormDialog({
                     <Select
                       value={userRole}
                       onValueChange={(value) =>
-                        setUserRole(value as "customer_admin" | "customer_user")
+                        setUserRole("customer_admin")
                       }
                     >
                       <SelectTrigger>
@@ -563,9 +563,7 @@ export default function CustomerFormDialog({
                         <SelectItem value="customer_admin">
                           Customer Admin
                         </SelectItem>
-                        <SelectItem value="customer_user">
-                          Customer User
-                        </SelectItem>
+                        {/* Only customer_admin role available now - removed customer_user */}
                       </SelectContent>
                     </Select>
                   </div>

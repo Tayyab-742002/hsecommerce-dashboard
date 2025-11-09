@@ -51,6 +51,20 @@ serve(async (req) => {
       );
     }
 
+    // Validate role is customer_admin (only role allowed for customers)
+    if (role !== "customer_admin") {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Invalid role: only 'customer_admin' is allowed for customer accounts",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Create Admin client with service role key (bypasses RLS)
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {

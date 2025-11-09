@@ -4,7 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import Spinner from "@/components/Spinner";
-import { Search } from "lucide-react";
+import { Search, Filter, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface InventoryItem {
   id: string;
@@ -32,6 +40,10 @@ export default function CustomerInventory() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchInventory();
@@ -72,11 +84,66 @@ export default function CustomerInventory() {
     setLoading(false);
   };
 
-  const filteredItems = items.filter(
-    (item) =>
+  // Helper function to filter by date
+  const filterByDate = (item: InventoryItem) => {
+    if (dateFilter === "all") return true;
+    
+    // Extract date parts from the item date string (format: YYYY-MM-DD)
+    const itemDateStr = item.received_date.split('T')[0]; // Get just the date part
+    const [itemYear, itemMonth, itemDay] = itemDateStr.split('-').map(Number);
+    
+    // Create date objects at midnight local time
+    const itemDate = new Date(itemYear, itemMonth - 1, itemDay);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    switch (dateFilter) {
+      case "today":
+        const todayYear = today.getFullYear();
+        const todayMonth = today.getMonth();
+        const todayDay = today.getDate();
+        return itemYear === todayYear && itemMonth - 1 === todayMonth && itemDay === todayDay;
+      case "week":
+        const weekAgo = new Date(today);
+        weekAgo.setDate(today.getDate() - 7);
+        return itemDate >= weekAgo && itemDate <= today;
+      case "month":
+        const monthAgo = new Date(today);
+        monthAgo.setDate(today.getDate() - 30); // Last 30 days
+        return itemDate >= monthAgo && itemDate <= today;
+      default:
+        return true;
+    }
+  };
+
+  const filteredItems = items.filter((item) => {
+    // Search filter
+    const matchesSearch =
       item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.item_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      item.item_name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Date filter
+    const matchesDate = filterByDate(item);
+    
+    // Status filter
+    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+    
+    // Category filter
+    const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+    
+    return matchesSearch && matchesDate && matchesStatus && matchesCategory;
+  });
+
+  // Get unique categories for filter
+  const categories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
+
+  const clearFilters = () => {
+    setDateFilter("all");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+  };
+
+  const hasActiveFilters = dateFilter !== "all" || statusFilter !== "all" || categoryFilter !== "all";
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -87,15 +154,98 @@ export default function CustomerInventory() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Inventory Items</CardTitle>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search items..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 focus:border-none"
-            />
+          <div className="flex items-center justify-between mb-4">
+            <CardTitle>Inventory Items</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="relative"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-2 bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
+                  {[dateFilter !== "all", statusFilter !== "all", categoryFilter !== "all"].filter(Boolean).length}
+                </span>
+              )}
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search items..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 focus:border-none"
+              />
+            </div>
+
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date Range</label>
+                  <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="in_stock">In Stock</SelectItem>
+                      <SelectItem value="low_stock">Low Stock</SelectItem>
+                      <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category || ""}>
+                          {category || "Uncategorized"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {hasActiveFilters && (
+                  <div className="md:col-span-3 flex justify-end">
+                    <Button variant="ghost" size="sm" onClick={clearFilters}>
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Filters
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredItems.length} of {items.length} items
+            </div>
           </div>
         </CardHeader>
         <CardContent>

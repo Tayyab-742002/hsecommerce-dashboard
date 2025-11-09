@@ -4,11 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Filter, X } from "lucide-react";
 import InventoryFormDialog from "@/components/InventoryFormDialog";
 import { toast } from "sonner";
 import Spinner from "@/components/Spinner";
 import { useSearchParams } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +64,12 @@ export default function AdminInventory() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
+  
+  // Filter states
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   const fetchInventory = useCallback(async () => {
     try {
@@ -88,14 +101,80 @@ export default function AdminInventory() {
     fetchInventory();
   }, [fetchInventory]);
 
-  const filteredItems = items.filter(
-    (item) =>
+  // Helper function to filter by date
+  const filterByDate = (item: InventoryItem) => {
+    if (dateFilter === "all") return true;
+    
+    // Extract date parts from the item date string (format: YYYY-MM-DD)
+    const itemDateStr = item.received_date.split('T')[0]; // Get just the date part
+    const [itemYear, itemMonth, itemDay] = itemDateStr.split('-').map(Number);
+    
+    // Create date objects at midnight local time
+    const itemDate = new Date(itemYear, itemMonth - 1, itemDay);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    switch (dateFilter) {
+      case "today":
+        const todayYear = today.getFullYear();
+        const todayMonth = today.getMonth();
+        const todayDay = today.getDate();
+        return itemYear === todayYear && itemMonth - 1 === todayMonth && itemDay === todayDay;
+      case "week":
+        const weekAgo = new Date(today);
+        weekAgo.setDate(today.getDate() - 7);
+        return itemDate >= weekAgo && itemDate <= today;
+      case "month":
+        const monthAgo = new Date(today);
+        monthAgo.setDate(today.getDate() - 30); // Last 30 days
+        return itemDate >= monthAgo && itemDate <= today;
+      default:
+        return true;
+    }
+  };
+
+  const filteredItems = items.filter((item) => {
+    // Search filter
+    const matchesSearch =
       item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.customers?.company_name
         ?.toLowerCase()
-        .includes(searchTerm.toLowerCase())
+        .includes(searchTerm.toLowerCase());
+    
+    // Date filter
+    const matchesDate = filterByDate(item);
+    
+    // Status filter
+    const matchesStatus =
+      statusFilter === "all" || item.status === statusFilter;
+    
+    // Category filter
+    const matchesCategory =
+      categoryFilter === "all" || 
+      item.category?.toLowerCase() === categoryFilter.toLowerCase();
+    
+    return matchesSearch && matchesDate && matchesStatus && matchesCategory;
+  });
+
+  // Get unique categories for filter
+  const categories = Array.from(
+    new Set(items.map((item) => item.category).filter(Boolean))
   );
+
+  // Clear all filters
+  const clearFilters = () => {
+    setDateFilter("all");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    setSearchTerm("");
+  };
+
+  const hasActiveFilters = 
+    dateFilter !== "all" || 
+    statusFilter !== "all" || 
+    categoryFilter !== "all" || 
+    searchTerm !== "";
 
   const handleEdit = (item: InventoryItem) => {
     setSelectedItem(item);
@@ -148,7 +227,7 @@ export default function AdminInventory() {
       </div>
 
       <Card className="border border-border shadow-sm">
-        <CardHeader className="space-y-2">
+        <CardHeader className="space-y-4">
           <CardTitle className="text-xl font-semibold">
             All Inventory Items
           </CardTitle>
@@ -160,6 +239,96 @@ export default function AdminInventory() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
+          </div>
+          
+          {/* Filter Toggle Button */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                  {[dateFilter !== "all", statusFilter !== "all", categoryFilter !== "all", searchTerm !== ""].filter(Boolean).length}
+                </span>
+              )}
+            </Button>
+            
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+              {/* Date Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Received Date</label>
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Status Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="in_stock">In Stock</SelectItem>
+                    <SelectItem value="low_stock">Low Stock</SelectItem>
+                    <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Category Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category || ""}>
+                        {category || "Uncategorized"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
+          {/* Results Count */}
+          <div className="text-sm text-muted-foreground">
+            Showing {filteredItems.length} of {items.length} items
           </div>
         </CardHeader>
         <CardContent>

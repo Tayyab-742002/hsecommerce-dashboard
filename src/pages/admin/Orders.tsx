@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Plus, Search, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Filter, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import OrderWizard from "@/components/OrderWizard";
 import OrderStatusDialog from "@/components/OrderStatusDialog";
 import OrderDetailsDialog from "@/components/OrderDetailsDialog";
@@ -70,6 +77,12 @@ export default function AdminOrders() {
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  
+  // Filter states
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -95,13 +108,73 @@ export default function AdminOrders() {
     setLoading(false);
   };
 
-  const filteredOrders = orders.filter(
-    (order) =>
+  // Helper function to filter by date
+  const filterByDate = (order: Order) => {
+    if (dateFilter === "all") return true;
+    
+    // Extract date parts from the order date string (format: YYYY-MM-DD)
+    const orderDateStr = order.requested_date.split('T')[0]; // Get just the date part
+    const [orderYear, orderMonth, orderDay] = orderDateStr.split('-').map(Number);
+    
+    // Create date objects at midnight local time
+    const orderDate = new Date(orderYear, orderMonth - 1, orderDay);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    switch (dateFilter) {
+      case "today":
+        const todayYear = today.getFullYear();
+        const todayMonth = today.getMonth();
+        const todayDay = today.getDate();
+        return orderYear === todayYear && orderMonth - 1 === todayMonth && orderDay === todayDay;
+      case "week":
+        const weekAgo = new Date(today);
+        weekAgo.setDate(today.getDate() - 7);
+        return orderDate >= weekAgo && orderDate <= today;
+      case "month":
+        const monthAgo = new Date(today);
+        monthAgo.setDate(today.getDate() - 30); // Last 30 days
+        return orderDate >= monthAgo && orderDate <= today;
+      default:
+        return true;
+    }
+  };
+
+  const filteredOrders = orders.filter((order) => {
+    // Search filter
+    const matchesSearch =
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customers?.company_name
         ?.toLowerCase()
-        .includes(searchTerm.toLowerCase())
-  );
+        .includes(searchTerm.toLowerCase());
+    
+    // Date filter
+    const matchesDate = filterByDate(order);
+    
+    // Status filter
+    const matchesStatus =
+      statusFilter === "all" || order.status === statusFilter;
+    
+    // Order type filter
+    const matchesOrderType =
+      orderTypeFilter === "all" || order.order_type === orderTypeFilter;
+    
+    return matchesSearch && matchesDate && matchesStatus && matchesOrderType;
+  });
+
+  // Clear all filters
+  const clearFilters = () => {
+    setDateFilter("all");
+    setStatusFilter("all");
+    setOrderTypeFilter("all");
+    setSearchTerm("");
+  };
+
+  const hasActiveFilters = 
+    dateFilter !== "all" || 
+    statusFilter !== "all" || 
+    orderTypeFilter !== "all" || 
+    searchTerm !== "";
 
   const handleStatusChange = (orderId: string, currentStatus: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -179,7 +252,7 @@ export default function AdminOrders() {
       </div>
 
       <Card className="border border-border shadow-sm">
-        <CardHeader className="space-y-2">
+        <CardHeader className="space-y-4">
           <CardTitle className="text-xl font-semibold">All Orders</CardTitle>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 transform h-4 w-4 text-muted-foreground" />
@@ -189,6 +262,94 @@ export default function AdminOrders() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
+          </div>
+
+          {/* Filter Toggle Button */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                  {[dateFilter !== "all", statusFilter !== "all", orderTypeFilter !== "all", searchTerm !== ""].filter(Boolean).length}
+                </span>
+              )}
+            </Button>
+            
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+              {/* Date Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Order Date</label>
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Status Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Order Type Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Order Type</label>
+                <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="pickup">Pickup</SelectItem>
+                    <SelectItem value="delivery">Delivery</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
+          {/* Results Count */}
+          <div className="text-sm text-muted-foreground">
+            Showing {filteredOrders.length} of {orders.length} orders
           </div>
         </CardHeader>
         <CardContent>

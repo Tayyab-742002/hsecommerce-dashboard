@@ -172,46 +172,62 @@ export default function AdminCustomers() {
                       </div>
                       <StatusBadge status={customer.status} />
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm">
-                      <div className="text-muted-foreground text-xs">
-                        Contact
+                    <div className="mt-2 space-y-1.5 text-sm">
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-muted-foreground text-xs">
+                          Contact
+                        </div>
+                        <div className="text-right">
+                          {customer.contact_person}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        {customer.contact_person}
+                      <div className="grid grid-cols-[auto_1fr] gap-1.5 items-start">
+                        <div className="text-muted-foreground text-xs">Email</div>
+                        <div className="text-right text-xs break-all">{customer.email}</div>
                       </div>
-                      <div className="text-muted-foreground text-xs">Email</div>
-                      <div className="text-right">{customer.email}</div>
-                      <div className="text-muted-foreground text-xs">Phone</div>
-                      <div className="text-right">{customer.phone}</div>
-                      <div className="text-muted-foreground text-xs">Type</div>
-                      <div className="text-right capitalize">
-                        {customer.customer_type}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-muted-foreground text-xs">Phone</div>
+                        <div className="text-right">{customer.phone}</div>
                       </div>
-                      <div className="text-muted-foreground text-xs">
-                        Address
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-muted-foreground text-xs">Type</div>
+                        <div className="text-right capitalize">
+                          {customer.customer_type}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        {customer.address_line1 || "-"}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-muted-foreground text-xs">
+                          Address
+                        </div>
+                        <div className="text-right">
+                          {customer.address_line1 || "-"}
+                        </div>
                       </div>
-                      <div className="text-muted-foreground text-xs">
-                        Location
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-muted-foreground text-xs">
+                          Location
+                        </div>
+                        <div className="text-right">
+                          {customer.city}, {customer.country}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        {customer.city}, {customer.country}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-muted-foreground text-xs">
+                          Credit Limit
+                        </div>
+                        <div className="text-right">
+                          {typeof customer.credit_limit === "number"
+                            ? formatCurrency(customer.credit_limit)
+                            : "-"}
+                        </div>
                       </div>
-                      <div className="text-muted-foreground text-xs">
-                        Credit Limit
-                      </div>
-                      <div className="text-right">
-                        {typeof customer.credit_limit === "number"
-                          ? formatCurrency(customer.credit_limit)
-                          : "-"}
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        Payment
-                      </div>
-                      <div className="text-right">
-                        {customer.payment_terms || "-"}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-muted-foreground text-xs">
+                          Payment
+                        </div>
+                        <div className="text-right">
+                          {customer.payment_terms || "-"}
+                        </div>
                       </div>
                     </div>
                     <div className="mt-3 flex justify-end gap-2">

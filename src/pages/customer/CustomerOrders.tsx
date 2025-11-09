@@ -6,7 +6,15 @@ import { StatusBadge } from "@/components/StatusBadge";
 import OrderDetailsDialog from "@/components/OrderDetailsDialog";
 import Spinner from "@/components/Spinner";
 import { formatCurrency } from "@/lib/currency";
-import { Search } from "lucide-react";
+import { Search, Filter, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Order {
   id: string;
@@ -38,6 +46,10 @@ export default function CustomerOrders() {
   const [loading, setLoading] = useState(true);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -79,9 +91,61 @@ export default function CustomerOrders() {
     setLoading(false);
   };
 
-  const filteredOrders = orders.filter((order) =>
-    order.order_number.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Helper function to filter by date
+  const filterByDate = (order: Order) => {
+    if (dateFilter === "all") return true;
+    
+    // Extract date parts from the order date string (format: YYYY-MM-DD)
+    const orderDateStr = order.requested_date.split('T')[0]; // Get just the date part
+    const [orderYear, orderMonth, orderDay] = orderDateStr.split('-').map(Number);
+    
+    // Create date objects at midnight local time
+    const orderDate = new Date(orderYear, orderMonth - 1, orderDay);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    switch (dateFilter) {
+      case "today":
+        const todayYear = today.getFullYear();
+        const todayMonth = today.getMonth();
+        const todayDay = today.getDate();
+        return orderYear === todayYear && orderMonth - 1 === todayMonth && orderDay === todayDay;
+      case "week":
+        const weekAgo = new Date(today);
+        weekAgo.setDate(today.getDate() - 7);
+        return orderDate >= weekAgo && orderDate <= today;
+      case "month":
+        const monthAgo = new Date(today);
+        monthAgo.setDate(today.getDate() - 30); // Last 30 days
+        return orderDate >= monthAgo && orderDate <= today;
+      default:
+        return true;
+    }
+  };
+
+  const filteredOrders = orders.filter((order) => {
+    // Search filter
+    const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Date filter
+    const matchesDate = filterByDate(order);
+    
+    // Status filter
+    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    
+    // Order type filter
+    const matchesOrderType = orderTypeFilter === "all" || order.order_type === orderTypeFilter;
+    
+    return matchesSearch && matchesDate && matchesStatus && matchesOrderType;
+  });
+
+  const clearFilters = () => {
+    setDateFilter("all");
+    setStatusFilter("all");
+    setOrderTypeFilter("all");
+  };
+
+  const hasActiveFilters = dateFilter !== "all" || statusFilter !== "all" || orderTypeFilter !== "all";
 
   const handleOrderClick = (orderId: string) => {
     setSelectedOrderId(orderId);
@@ -97,15 +161,96 @@ export default function CustomerOrders() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Order History</CardTitle>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search orders..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 focus:border-none"
-            />
+          <div className="flex items-center justify-between mb-4">
+            <CardTitle>Order History</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="relative"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-2 bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
+                  {[dateFilter !== "all", statusFilter !== "all", orderTypeFilter !== "all"].filter(Boolean).length}
+                </span>
+              )}
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search orders..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 focus:border-none"
+              />
+            </div>
+
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date Range</label>
+                  <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="processing">Processing</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Order Type</label>
+                  <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="pickup">Pickup</SelectItem>
+                      <SelectItem value="delivery">Delivery</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {hasActiveFilters && (
+                  <div className="md:col-span-3 flex justify-end">
+                    <Button variant="ghost" size="sm" onClick={clearFilters}>
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Filters
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredOrders.length} of {orders.length} orders
+            </div>
           </div>
         </CardHeader>
         <CardContent>
