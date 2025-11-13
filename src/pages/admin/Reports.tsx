@@ -23,7 +23,7 @@ import {
 import {
   Package,
   TrendingUp,
-  DollarSign,
+  PoundSterling,
   FileText,
   RefreshCw,
   Users,
@@ -300,7 +300,7 @@ export default function AdminReports() {
         <KPICard
           title="Total Revenue"
           value={`£${stats.totalRevenue.toLocaleString()}`}
-          icon={DollarSign}
+          icon={PoundSterling}
         />
         <KPICard
           title="Monthly Orders"

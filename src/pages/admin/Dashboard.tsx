@@ -8,12 +8,17 @@ import {
   Warehouse,
   RefreshCw,
   Boxes,
+  PoundSterling,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/currency";
 
 interface DashboardStats {
+  todayRevenue: number;
+  weeklyRevenue: number;
+  monthlyRevenue: number;
   totalInventory: number;
   totalCustomers: number;
   pendingOrders: number;
@@ -37,6 +42,9 @@ interface Order {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
+    todayRevenue: 0,
+    weeklyRevenue: 0,
+    monthlyRevenue: 0,
     totalInventory: 0,
     totalCustomers: 0,
     pendingOrders: 0,
@@ -53,6 +61,19 @@ export default function AdminDashboard() {
     else setIsLoading(true);
 
     try {
+      // Calculate date ranges for revenue
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayDateStr = today.toISOString().split('T')[0];
+      
+      const weekAgo = new Date(today);
+      weekAgo.setDate(today.getDate() - 7);
+      const weekStart = weekAgo.toISOString().split('T')[0];
+      
+      const monthAgo = new Date(today);
+      monthAgo.setDate(today.getDate() - 30);
+      const monthStart = monthAgo.toISOString().split('T')[0];
+
       const [
         { count: inventoryCount },
         { count: customerCount },
@@ -60,6 +81,9 @@ export default function AdminDashboard() {
         { data: warehouse },
         { data: orders },
         { data: inventoryItems },
+        { data: todayOrders },
+        { data: weeklyOrders },
+        { data: monthlyOrders },
       ] = await Promise.all([
         supabase
           .from("inventory_items")
@@ -76,6 +100,21 @@ export default function AdminDashboard() {
           .order("created_at", { ascending: false })
           .limit(5),
         supabase.from("inventory_items").select("quantity, total_quantity"),
+        // Revenue queries - filter by requested_date
+        supabase
+          .from("outbound_orders")
+          .select("total_charges, requested_date")
+          .eq("requested_date", todayDateStr),
+        supabase
+          .from("outbound_orders")
+          .select("total_charges, requested_date")
+          .gte("requested_date", weekStart)
+          .lte("requested_date", todayDateStr),
+        supabase
+          .from("outbound_orders")
+          .select("total_charges, requested_date")
+          .gte("requested_date", monthStart)
+          .lte("requested_date", todayDateStr),
       ]);
 
       // Calculate total current and total quantities
@@ -96,7 +135,29 @@ export default function AdminDashboard() {
         0
       );
 
+      // Calculate revenue for different time periods
+      // Today's revenue - already filtered by exact date match in query
+      const todayRevenue = (todayOrders || []).reduce(
+        (sum, order) => sum + (order.total_charges || 0),
+        0
+      );
+
+      // Calculate weekly revenue (last 7 days including today)
+      const weeklyRevenue = (weeklyOrders || []).reduce(
+        (sum, order) => sum + (order.total_charges || 0),
+        0
+      );
+
+      // Calculate monthly revenue (last 30 days including today)
+      const monthlyRevenue = (monthlyOrders || []).reduce(
+        (sum, order) => sum + (order.total_charges || 0),
+        0
+      );
+
       setStats({
+        todayRevenue,
+        weeklyRevenue,
+        monthlyRevenue,
         totalInventory: inventoryCount || 0,
         totalCustomers: customerCount || 0,
         pendingOrders: pendingCount || 0,
@@ -167,7 +228,22 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <KPICard
+          title="Today Revenue"
+          value={formatCurrency(stats.todayRevenue)}
+          icon={PoundSterling}
+        />
+        <KPICard
+          title="Weekly Revenue"
+          value={formatCurrency(stats.weeklyRevenue)}
+          icon={PoundSterling}
+        />
+        <KPICard
+          title="Monthly Revenue"
+          value={formatCurrency(stats.monthlyRevenue)}
+          icon={PoundSterling}
+        />
         <KPICard
           title="Total Inventory"
           value={stats.totalInventory}

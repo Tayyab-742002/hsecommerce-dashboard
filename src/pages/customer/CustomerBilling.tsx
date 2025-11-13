@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KPICard } from "@/components/KPICard";
 import Spinner from "@/components/Spinner";
 import { formatCurrency } from "@/lib/currency";
-import { DollarSign, TrendingUp, Package } from "lucide-react";
+import { PoundSterling, TrendingUp, Package } from "lucide-react";
 
 export default function CustomerBilling() {
   const [stats, setStats] = useState({
@@ -83,7 +83,7 @@ export default function CustomerBilling() {
         <KPICard
           title="Total Charges"
           value={formatCurrency(stats.totalCharges)}
-          icon={DollarSign}
+          icon={PoundSterling}
         />
         <KPICard
           title="This Month"
