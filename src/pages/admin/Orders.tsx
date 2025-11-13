@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Plus, Search, RefreshCw, Trash2, Filter, X } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Filter, X, CalendarIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import OrderWizard from "@/components/OrderWizard";
 import OrderStatusDialog from "@/components/OrderStatusDialog";
 import OrderDetailsDialog from "@/components/OrderDetailsDialog";
@@ -80,6 +88,7 @@ export default function AdminOrders() {
   
   // Filter states
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [customDate, setCustomDate] = useState<Date | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
@@ -110,6 +119,19 @@ export default function AdminOrders() {
 
   // Helper function to filter by date
   const filterByDate = (order: Order) => {
+    // If custom date is selected, use it instead of dateFilter
+    if (customDate) {
+      const orderDateStr = order.requested_date.split('T')[0];
+      const [orderYear, orderMonth, orderDay] = orderDateStr.split('-').map(Number);
+      const orderDate = new Date(orderYear, orderMonth - 1, orderDay);
+      
+      const selectedDate = new Date(customDate);
+      selectedDate.setHours(0, 0, 0, 0);
+      orderDate.setHours(0, 0, 0, 0);
+      
+      return orderDate.getTime() === selectedDate.getTime();
+    }
+    
     if (dateFilter === "all") return true;
     
     // Extract date parts from the order date string (format: YYYY-MM-DD)
@@ -165,6 +187,7 @@ export default function AdminOrders() {
   // Clear all filters
   const clearFilters = () => {
     setDateFilter("all");
+    setCustomDate(undefined);
     setStatusFilter("all");
     setOrderTypeFilter("all");
     setSearchTerm("");
@@ -172,9 +195,28 @@ export default function AdminOrders() {
 
   const hasActiveFilters = 
     dateFilter !== "all" || 
+    customDate !== undefined ||
     statusFilter !== "all" || 
     orderTypeFilter !== "all" || 
     searchTerm !== "";
+
+  // Handle date filter change - clear custom date when preset is selected
+  const handleDateFilterChange = (value: string) => {
+    setDateFilter(value);
+    if (value !== "all") {
+      setCustomDate(undefined);
+    }
+  };
+
+  // Handle custom date selection - set dateFilter to "custom"
+  const handleCustomDateSelect = (date: Date | undefined) => {
+    setCustomDate(date);
+    if (date) {
+      setDateFilter("custom");
+    } else {
+      setDateFilter("all");
+    }
+  };
 
   const handleStatusChange = (orderId: string, currentStatus: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -276,7 +318,7 @@ export default function AdminOrders() {
               Filters
               {hasActiveFilters && (
                 <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
-                  {[dateFilter !== "all", statusFilter !== "all", orderTypeFilter !== "all", searchTerm !== ""].filter(Boolean).length}
+                  {[dateFilter !== "all" || customDate !== undefined, statusFilter !== "all", orderTypeFilter !== "all", searchTerm !== ""].filter(Boolean).length}
                 </span>
               )}
             </Button>
@@ -300,7 +342,7 @@ export default function AdminOrders() {
               {/* Date Filter */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Order Date</label>
-                <Select value={dateFilter} onValueChange={setDateFilter}>
+                <Select value={dateFilter} onValueChange={handleDateFilterChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Time" />
                   </SelectTrigger>
@@ -309,8 +351,35 @@ export default function AdminOrders() {
                     <SelectItem value="today">Today</SelectItem>
                     <SelectItem value="week">This Week</SelectItem>
                     <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="custom">Custom Date</SelectItem>
                   </SelectContent>
                 </Select>
+                
+                {/* Custom Date Picker - Show when custom is selected */}
+                {dateFilter === "custom" && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !customDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {customDate ? format(customDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customDate}
+                        onSelect={handleCustomDateSelect}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
 
               {/* Status Filter */}
