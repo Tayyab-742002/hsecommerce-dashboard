@@ -40,6 +40,13 @@ interface Order {
   };
 }
 
+interface TopCustomer {
+  id: string;
+  name: string;
+  revenue: number;
+  orders: number;
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     todayRevenue: 0,
@@ -53,6 +60,7 @@ export default function AdminDashboard() {
     totalQuantity: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -84,6 +92,7 @@ export default function AdminDashboard() {
         { data: todayOrders },
         { data: weeklyOrders },
         { data: monthlyOrders },
+        { data: customersData },
       ] = await Promise.all([
         supabase
           .from("inventory_items")
@@ -115,6 +124,7 @@ export default function AdminDashboard() {
           .select("total_charges, requested_date")
           .gte("requested_date", monthStart)
           .lte("requested_date", todayDateStr),
+        supabase.from("customers").select("id, company_name, customer_code"),
       ]);
 
       // Calculate total current and total quantities
@@ -167,6 +177,37 @@ export default function AdminDashboard() {
       });
 
       setRecentOrders(orders || []);
+
+      // Fetch top customers by revenue
+      if (customersData) {
+        const customerRevenuePromises = customersData.map(async (customer) => {
+          const { data: orders } = await supabase
+            .from("outbound_orders")
+            .select("total_charges")
+            .eq("customer_id", customer.id);
+
+          const revenue =
+            orders?.reduce(
+              (sum, order) => sum + (order.total_charges || 0),
+              0
+            ) || 0;
+
+          return {
+            id: customer.id,
+            name: customer.company_name || customer.customer_code,
+            revenue,
+            orders: orders?.length || 0,
+          };
+        });
+
+        const customerRevenueData = await Promise.all(customerRevenuePromises);
+        // Sort by revenue descending and take top 5
+        const sortedTopCustomers = customerRevenueData
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5);
+        
+        setTopCustomers(sortedTopCustomers);
+      }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -266,8 +307,55 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Recent Orders Section */}
-      <Card className="border border-border shadow-sm">
+      {/* Top Customers by Revenue Section */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="border border-border shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Top Customers by Revenue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topCustomers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center">
+                <Users className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  No customer revenue data available
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {topCustomers.map((customer, index) => (
+                  <div
+                    key={customer.id}
+                    className="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="font-semibold">{customer.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {customer.orders} {customer.orders === 1 ? "order" : "orders"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-primary">
+                        {formatCurrency(customer.revenue)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Orders Section */}
+        <Card className="border border-border shadow-sm">
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-xl font-semibold">Recent Orders</CardTitle>
         </CardHeader>
@@ -385,6 +473,7 @@ export default function AdminDashboard() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

@@ -37,6 +37,7 @@ interface Customer {
   country: string;
   address_line1?: string;
   created_at: string;
+  total_revenue?: number;
 }
 
 export default function AdminCustomers() {
@@ -63,7 +64,25 @@ export default function AdminCustomers() {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setCustomers(data);
+      // Fetch revenue for each customer
+      const customersWithRevenue = await Promise.all(
+        data.map(async (customer) => {
+          const { data: orders } = await supabase
+            .from("outbound_orders")
+            .select("total_charges")
+            .eq("customer_id", customer.id);
+
+          const totalRevenue =
+            orders?.reduce(
+              (sum, order) => sum + (order.total_charges || 0),
+              0
+            ) || 0;
+
+          return { ...customer, total_revenue: totalRevenue };
+        })
+      );
+
+      setCustomers(customersWithRevenue);
     }
     setLoading(false);
   };
@@ -229,6 +248,14 @@ export default function AdminCustomers() {
                           {customer.payment_terms || "-"}
                         </div>
                       </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-muted-foreground text-xs font-semibold">
+                          Total Revenue
+                        </div>
+                        <div className="text-right font-semibold text-primary">
+                          {formatCurrency(customer.total_revenue || 0)}
+                        </div>
+                      </div>
                     </div>
                     <div className="mt-3 flex justify-end gap-2">
                       <Button
@@ -262,7 +289,7 @@ export default function AdminCustomers() {
 
               {/* Desktop table */}
               <div className="hidden md:block w-full overflow-x-auto">
-                <div className="table-container min-w-[1100px] pr-4">
+                <div className="table-container min-w-[1200px] pr-4">
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -278,6 +305,7 @@ export default function AdminCustomers() {
                         {/* <th>Credit Limit</th> */}
                         {/* <th>Payment Terms</th> */}
                         {/* <th>Tax ID</th> */}
+                        <th>Total Revenue</th>
                         <th>Joined</th>
                         <th>Actions</th>
                       </tr>
@@ -329,6 +357,9 @@ export default function AdminCustomers() {
                           {/* <td className="whitespace-nowrap">
                             {customer.tax_id || "-"}
                           </td> */}
+                          <td className="whitespace-nowrap font-semibold text-primary">
+                            {formatCurrency(customer.total_revenue || 0)}
+                          </td>
                           <td className="whitespace-nowrap">
                             {new Date(customer.created_at).toLocaleDateString()}
                           </td>

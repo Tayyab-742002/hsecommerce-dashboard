@@ -68,6 +68,12 @@ interface RevenueData {
   orders: number;
 }
 
+interface CustomerRevenueData {
+  name: string;
+  revenue: number;
+  orders: number;
+}
+
 export default function AdminReports() {
   const [stats, setStats] = useState<Stats>({
     totalRevenue: 0,
@@ -80,6 +86,7 @@ export default function AdminReports() {
     []
   );
   const [revenueByMonth, setRevenueByMonth] = useState<RevenueData[]>([]);
+  const [customerRevenue, setCustomerRevenue] = useState<CustomerRevenueData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -96,6 +103,7 @@ export default function AdminReports() {
         activeCustomersCount,
         statusData,
         categoryData,
+        customersData,
       ] = await Promise.all([
         supabase.from("outbound_orders").select("total_charges, created_at"),
         supabase
@@ -116,6 +124,7 @@ export default function AdminReports() {
           .eq("status", "active"),
         supabase.from("outbound_orders").select("status"),
         supabase.from("inventory_items").select("category, quantity"),
+        supabase.from("customers").select("id, company_name, customer_code"),
       ]);
 
       // Calculate total revenue
@@ -206,6 +215,36 @@ export default function AdminReports() {
 
       const resolvedRevenue = await Promise.all(revenuePromises);
       setRevenueByMonth(resolvedRevenue);
+
+      // Calculate customer revenue breakdown
+      if (customersData.data) {
+        const customerRevenuePromises = customersData.data.map(async (customer) => {
+          const { data: orders } = await supabase
+            .from("outbound_orders")
+            .select("total_charges")
+            .eq("customer_id", customer.id);
+
+          const revenue =
+            orders?.reduce(
+              (sum, order) => sum + (order.total_charges || 0),
+              0
+            ) || 0;
+
+          return {
+            name: customer.company_name || customer.customer_code,
+            revenue,
+            orders: orders?.length || 0,
+          };
+        });
+
+        const customerRevenueData = await Promise.all(customerRevenuePromises);
+        // Sort by revenue descending and take top 10
+        const sortedCustomerRevenue = customerRevenueData
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 10);
+        
+        setCustomerRevenue(sortedCustomerRevenue);
+      }
     } catch (error) {
       console.error("Error fetching report data:", error);
     } finally {
@@ -492,6 +531,114 @@ export default function AdminReports() {
                 />
               </LineChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Customer Revenue Breakdown Chart */}
+        <Card className="chart-card">
+          <CardHeader>
+            <CardTitle className="text-lg">Top Customers by Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={customerRevenue} layout="vertical">
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
+                  opacity={0.3}
+                />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 12 }}
+                  stroke="hsl(var(--muted-foreground))"
+                  tickFormatter={(value) => {
+                    if (value === 0) return "£0";
+                    if (value >= 1000000) {
+                      return `£${(value / 1000000).toFixed(1)}M`;
+                    } else if (value >= 1000) {
+                      return `£${(value / 1000).toFixed(0)}K`;
+                    } else {
+                      return `£${Math.round(value)}`;
+                    }
+                  }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 11 }}
+                  stroke="hsl(var(--muted-foreground))"
+                  width={120}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload as CustomerRevenueData;
+                      return (
+                        <div className="bg-card border border-border rounded-lg shadow-lg p-3">
+                          <p className="font-semibold text-sm mb-1">{data.name}</p>
+                          <p className="text-xs" style={{ color: payload[0].color }}>
+                            Revenue: {formatCurrency(data.revenue)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Orders: {data.orders}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: "12px" }} />
+                <Bar
+                  dataKey="revenue"
+                  fill={CHART_COLORS.primary}
+                  name="Revenue (GBP)"
+                  radius={[0, 8, 8, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Customer Revenue Table */}
+        <Card className="chart-card">
+          <CardHeader>
+            <CardTitle className="text-lg">Customer Revenue Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {customerRevenue.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No customer revenue data available
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-4 font-semibold">Customer</th>
+                      <th className="text-right py-3 px-4 font-semibold">Revenue</th>
+                      <th className="text-right py-3 px-4 font-semibold">Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerRevenue.map((customer, index) => (
+                      <tr
+                        key={index}
+                        className="border-b border-border hover:bg-muted/50 transition-colors"
+                      >
+                        <td className="py-3 px-4 font-medium">{customer.name}</td>
+                        <td className="py-3 px-4 text-right font-semibold text-primary">
+                          {formatCurrency(customer.revenue)}
+                        </td>
+                        <td className="py-3 px-4 text-right text-muted-foreground">
+                          {customer.orders}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
