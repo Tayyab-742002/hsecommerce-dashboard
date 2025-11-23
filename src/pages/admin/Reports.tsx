@@ -420,7 +420,7 @@ export default function AdminReports() {
         to = new Date(from);
         to.setHours(23, 59, 59, 999);
         break;
-      case "thisWeek":
+      case "thisWeek": {
         // Monday as start of week (getDay() returns 0=Sunday, 1=Monday, etc.)
         from = new Date(today);
         const dayOfWeek = from.getDay();
@@ -430,7 +430,8 @@ export default function AdminReports() {
         to = new Date(today);
         to.setHours(23, 59, 59, 999);
         break;
-      case "lastWeek":
+      }
+      case "lastWeek": {
         // Last week Monday to Sunday
         from = new Date(today);
         const lastWeekDay = from.getDay();
@@ -441,6 +442,7 @@ export default function AdminReports() {
         to.setDate(to.getDate() + 6); // Sunday of last week
         to.setHours(23, 59, 59, 999);
         break;
+      }
       case "thisMonth":
         from = new Date(today.getFullYear(), today.getMonth(), 1);
         from.setHours(0, 0, 0, 0);
