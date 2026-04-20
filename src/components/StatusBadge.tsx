@@ -17,6 +17,13 @@ export const StatusBadge = ({ status, className }: StatusBadgeProps) => {
     if (lowerStatus.includes('completed') || lowerStatus.includes('delivered')) return 'status-completed';
     if (lowerStatus.includes('cancelled')) return 'status-cancelled';
 
+    // Pallet statuses
+    if (lowerStatus === 'in_storage') return 'status-approved';
+    if (lowerStatus === 'receiving') return 'status-processing';
+    if (lowerStatus === 'partially_picked') return 'status-in-progress';
+    if (lowerStatus === 'empty') return 'status-cancelled';
+    if (lowerStatus === 'damaged') return 'status-cancelled';
+
     // Fallbacks to previous generic styles
     if (lowerStatus.includes('approved') || lowerStatus.includes('active')) return 'status-approved';
     if (lowerStatus.includes('progress') || lowerStatus.includes('picking') || lowerStatus.includes('packed')) return 'status-in-progress';

@@ -8,6 +8,7 @@ import {
   PackageSearch,
   FileText,
   LogOut,
+  Layers,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { name: "Dashboard", href: "/customer/dashboard", icon: LayoutDashboard },
   { name: "My Inventory", href: "/customer/inventory", icon: PackageSearch },
+  { name: "Pallets", href: "/customer/pallets", icon: Layers },
   { name: "Orders", href: "/customer/orders", icon: Package },
   { name: "Billing", href: "/customer/billing", icon: FileText },
 ];

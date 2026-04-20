@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   User,
+  Layers,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +22,7 @@ const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Customers", href: "/admin/customers", icon: Users },
   { name: "Inventory", href: "/admin/inventory", icon: PackageSearch },
-  // { name: 'Receive Items', href: '/admin/receive-inventory', icon: PackagePlus },
+  { name: "Pallets", href: "/admin/pallets", icon: Layers },
   { name: "Orders", href: "/admin/orders", icon: Package },
   { name: "Reports", href: "/admin/reports", icon: FileText },
   { name: "Settings", href: "/admin/settings", icon: Settings },
@@ -59,7 +60,7 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex w-full">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex md:w-64 bg-sidebar border-r border-sidebar-border flex-col shadow-lg">
+      <aside className="hidden md:flex md:w-64 bg-sidebar border-r border-sidebar-border flex-col shadow-lg fixed top-0 left-0 h-screen z-20">
         <div className="p-5 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="H&S E-commerce" width={50} height={50} />
@@ -202,7 +203,7 @@ export default function AdminLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto md:ml-64">
         {/* Top bar for mobile */}
         <div className="md:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border shadow-sm px-4 py-3 flex items-center justify-between">
           <button

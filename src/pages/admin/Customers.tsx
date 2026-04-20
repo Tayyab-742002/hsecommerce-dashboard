@@ -288,8 +288,8 @@ export default function AdminCustomers() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block w-full overflow-x-auto">
-                <div className="table-container min-w-[1200px] pr-4">
+              <div className="hidden md:block">
+                <div className="w-full overflow-auto max-h-[calc(100vh-280px)] rounded-md">
                   <table className="data-table">
                     <thead>
                       <tr>

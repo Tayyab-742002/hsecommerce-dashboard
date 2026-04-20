@@ -46,6 +46,7 @@ interface InventoryItem {
   dimension_unit?: string;
   status: string;
   received_date: string;
+  pallet_id?: string | null;
   customers: {
     company_name: string;
     contact_person: string;
@@ -53,6 +54,9 @@ interface InventoryItem {
   warehouses: {
     warehouse_name: string;
   };
+  pallets?: {
+    pallet_number: string;
+  } | null;
 }
 
 export default function AdminInventory() {
@@ -77,7 +81,8 @@ export default function AdminInventory() {
       let query = supabase.from("inventory_items").select(`
           *,
           customers (company_name, contact_person),
-          warehouses (warehouse_name)
+          warehouses (warehouse_name),
+          pallets (pallet_number)
         `);
 
       if (customerId) {
@@ -433,9 +438,9 @@ export default function AdminInventory() {
 
             {/* Desktop table */}
             <div className="hidden sm:block">
-              <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-auto max-h-[calc(100vh-280px)] rounded-md border border-border">
                 <table className="w-full border-collapse text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-card">
                     <tr className="border-b border-border text-xs uppercase text-muted-foreground">
                       <th className="px-3 py-3 text-left font-medium">
                         Item Code
@@ -455,6 +460,9 @@ export default function AdminInventory() {
                       {/* <th className="px-3 py-3 text-left font-medium">
                         Weight
                       </th> */}
+                      <th className="px-3 py-3 text-left font-medium">
+                        Pallet
+                      </th>
                       <th className="px-3 py-3 text-left font-medium">
                         Status
                       </th>
@@ -513,6 +521,9 @@ export default function AdminInventory() {
                               ? `${item.weight} ${item.weight_unit || "kg"}`
                               : "-"}
                           </td> */}
+                          <td className="px-3 py-3 whitespace-nowrap text-muted-foreground text-xs">
+                            {item.pallets?.pallet_number ?? "—"}
+                          </td>
                           <td className="px-3 py-3 whitespace-nowrap">
                             <StatusBadge status={item.status} />
                           </td>

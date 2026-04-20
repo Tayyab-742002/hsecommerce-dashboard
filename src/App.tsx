@@ -13,12 +13,14 @@ import AdminOrders from "./pages/admin/Orders";
 import AdminCustomers from "./pages/admin/Customers";
 import AdminReports from "./pages/admin/Reports";
 import AdminSettings from "./pages/admin/Settings";
+import AdminPallets from "./pages/admin/Pallets";
 import ReceiveInventory from "./pages/admin/ReceiveInventory";
 import CustomerLayout from "./pages/customer/CustomerLayout";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
 import CustomerInventory from "./pages/customer/CustomerInventory";
 import CustomerOrders from "./pages/customer/CustomerOrders";
 import CustomerBilling from "./pages/customer/CustomerBilling";
+import CustomerPallets from "./pages/customer/CustomerPallets";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,7 @@ const App = () => (
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="inventory" element={<AdminInventory />} />
+            <Route path="pallets" element={<AdminPallets />} />
             {/* <Route path="receive-inventory" element={<ReceiveInventory />} /> */}
             <Route path="orders" element={<AdminOrders />} />
             <Route path="customers" element={<AdminCustomers />} />
@@ -52,6 +55,7 @@ const App = () => (
             <Route index element={<Navigate to="/customer/dashboard" replace />} />
             <Route path="dashboard" element={<CustomerDashboard />} />
             <Route path="inventory" element={<CustomerInventory />} />
+            <Route path="pallets" element={<CustomerPallets />} />
             <Route path="orders" element={<CustomerOrders />} />
             <Route path="billing" element={<CustomerBilling />} />
           </Route>

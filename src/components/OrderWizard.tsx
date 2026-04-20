@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Search } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ interface OrderItem {
   quantity?: number;
   item_name: string;
   available_quantity: number;
+  pallet_id?: string | null;
 }
 
 export default function OrderWizard({ onComplete }: OrderWizardProps) {
@@ -49,11 +51,25 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
     order_type: "delivery",
     requested_date: new Date().toISOString().split("T")[0],
     special_instructions: "",
-    pick_and_pack_rate: 0, // Charge per quantity
+    pick_and_pack_rate: 0,
     delivery_charges: 0,
   });
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const customerInputRef = useRef<HTMLInputElement>(null);
+  const customerContainerRef = useRef<HTMLDivElement>(null);
+
+  const filteredCustomers = customers.filter((c) => {
+    const q = customerSearch.toLowerCase();
+    return (
+      c.company_name?.toLowerCase().includes(q) ||
+      c.contact_person?.toLowerCase().includes(q) ||
+      c.customer_code?.toLowerCase().includes(q)
+    );
+  });
 
   useEffect(() => {
     fetchCustomers();
@@ -85,7 +101,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
   const fetchInventory = async () => {
     const { data } = await supabase
       .from("inventory_items")
-      .select("id, item_code, item_name, quantity")
+      .select("id, item_code, item_name, quantity, pallet_id")
       .eq("customer_id", orderData.customer_id)
       .eq("warehouse_id", orderData.warehouse_id)
       .eq("status", "in_stock")
@@ -101,6 +117,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
         quantity: 1,
         item_name: "",
         available_quantity: 0,
+        pallet_id: null,
       },
     ]);
   };
@@ -118,6 +135,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
         inventory_item_id: value,
         item_name: item?.item_name || "",
         available_quantity: item?.quantity || 0,
+        pallet_id: item?.pallet_id ?? null,
       };
     } else {
       newItems[index] = { ...newItems[index], [field]: value };
@@ -135,7 +153,6 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       return;
     }
 
-    // Validate quantities
     const invalidItem = orderItems.find(
       (item) => (item.quantity ?? 0) > item.available_quantity || !item.quantity || item.quantity < 1
     );
@@ -152,11 +169,9 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       (sum, item) => sum + (item.quantity ?? 0),
       0
     );
-    // Calculate total charges: rate per quantity × total quantity
     const pickAndPackRate = orderData.pick_and_pack_rate ?? 0;
     const totalCharges = pickAndPackRate * totalQuantity;
 
-    // Generate order number
     const orderNumber = `OUT-${new Date().getFullYear()}-${String(
       Math.floor(Math.random() * 10000)
     ).padStart(5, "0")}`;
@@ -169,8 +184,8 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
         order_type: orderData.order_type,
         requested_date: orderData.requested_date,
         special_instructions: orderData.special_instructions || null,
-        handling_charges: totalCharges, // Store calculated total charges
-        delivery_charges: 0, // Keep for database compatibility
+        handling_charges: totalCharges,
+        delivery_charges: 0,
         order_number: orderNumber,
         total_items: orderItems.length,
         total_quantity: totalQuantity,
@@ -189,7 +204,6 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       return;
     }
 
-    // Insert order items
     const { error: itemsError } = await supabase
       .from("outbound_order_items")
       .insert(
@@ -197,7 +211,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           outbound_order_id: order.id,
           inventory_item_id: item.inventory_item_id,
           quantity: item.quantity ?? 1,
-          order_item: item.item_name, // Store item_name at time of order creation
+          order_item: item.item_name,
         }))
       );
 
@@ -210,12 +224,56 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       return;
     }
 
+    // Decrement pallet_items quantities for pallet-sourced items
+    const palletOrderItems = orderItems.filter((item) => item.pallet_id);
+    for (const item of palletOrderItems) {
+      const { data: palletItemRow } = await supabase
+        .from("pallet_items")
+        .select("id, quantity")
+        .eq("pallet_id", item.pallet_id!)
+        .eq("inventory_item_id", item.inventory_item_id)
+        .single();
+
+      if (palletItemRow) {
+        const newQty = Math.max(0, palletItemRow.quantity - (item.quantity ?? 0));
+        await supabase
+          .from("pallet_items")
+          .update({ quantity: newQty })
+          .eq("id", palletItemRow.id);
+
+        // Update pallet status based on remaining quantities across all its items
+        const { data: remainingItems } = await supabase
+          .from("pallet_items")
+          .select("quantity")
+          .eq("pallet_id", item.pallet_id!);
+
+        if (remainingItems) {
+          const totalRemaining = remainingItems.reduce(
+            (sum, r) => sum + (r.quantity ?? 0),
+            0
+          );
+          await supabase
+            .from("pallets")
+            .update({ status: totalRemaining <= 0 ? "empty" : "partially_picked" })
+            .eq("id", item.pallet_id!);
+        }
+      }
+    }
+
     toast({
       title: "Success",
       description: `Order ${orderNumber} created successfully`,
     });
     onComplete();
   };
+
+  const hasPalletItems = orderItems.some((item) => item.pallet_id);
+  const chargeLabel = hasPalletItems
+    ? "Pallet Handling Charges per Quantity (GBP)"
+    : "Pick and Pack Charge per Quantity (GBP)";
+  const chargeSummaryLabel = hasPalletItems
+    ? "Pallet Handling Charges:"
+    : "Pick and Pack Rate:";
 
   return (
     <Tabs value={step} onValueChange={setStep} className="w-full">
@@ -244,24 +302,56 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Customer *</Label>
-            <Select
-              value={orderData.customer_id}
-              onValueChange={(value) =>
-                setOrderData({ ...orderData, customer_id: value })
-              }
+            <div
+              ref={customerContainerRef}
+              className="relative"
+              onBlur={(e) => {
+                if (!customerContainerRef.current?.contains(e.relatedTarget as Node)) {
+                  setCustomerDropdownOpen(false);
+                }
+              }}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.company_name || customer.contact_person} (
-                    {customer.customer_code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                ref={customerInputRef}
+                placeholder="Search customer..."
+                value={customerSearch}
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value);
+                  setCustomerDropdownOpen(true);
+                  if (!e.target.value) {
+                    setOrderData({ ...orderData, customer_id: "" });
+                  }
+                }}
+                onFocus={() => setCustomerDropdownOpen(true)}
+                className="pl-9"
+              />
+              {customerDropdownOpen && filteredCustomers.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+                  {filteredCustomers.map((customer) => (
+                    <div
+                      key={customer.id}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setOrderData({ ...orderData, customer_id: customer.id });
+                        setCustomerSearch(
+                          customer.company_name || customer.contact_person
+                        );
+                        setCustomerDropdownOpen(false);
+                      }}
+                    >
+                      <span className="font-medium">
+                        {customer.company_name || customer.contact_person}
+                      </span>
+                      <span className="ml-2 text-muted-foreground text-xs">
+                        {customer.customer_code}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -418,21 +508,19 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           <CardContent className="pt-6 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Pick and Pack Charge per Quantity (GBP)</Label>
+                <Label>{chargeLabel}</Label>
                 <Input
                   type="number"
                   step="0.01"
                   value={orderData.pick_and_pack_rate ?? ""}
                   onChange={(e) => {
                     const value = e.target.value;
-                    // Allow empty string for clearing the field
                     if (value === "") {
                       setOrderData({
                         ...orderData,
                         pick_and_pack_rate: undefined,
                       });
                     } else {
-                      // Parse the number (handles both positive and negative numbers)
                       const numValue = parseFloat(value);
                       if (!isNaN(numValue)) {
                         setOrderData({
@@ -443,13 +531,8 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                     }
                   }}
                   onBlur={(e) => {
-                    const value = e.target.value;
-                    // If empty, set to 0 on blur
-                    if (value === "") {
-                      setOrderData({
-                        ...orderData,
-                        pick_and_pack_rate: 0,
-                      });
+                    if (e.target.value === "") {
+                      setOrderData({ ...orderData, pick_and_pack_rate: 0 });
                     }
                   }}
                 />
@@ -499,7 +582,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Pick and Pack Rate:</span>
+                  <span>{chargeSummaryLabel}</span>
                   <span className="font-medium">
                     {formatCurrency(orderData.pick_and_pack_rate ?? 0)} per quantity
                   </span>

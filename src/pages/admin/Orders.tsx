@@ -440,69 +440,59 @@ export default function AdminOrders() {
                     className="rounded-lg border border-border bg-card p-3 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleOrderClick(order.id)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="font-semibold whitespace-nowrap">
+                    {/* Title row — truncate long item names, badge never wraps */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-semibold text-sm leading-snug line-clamp-2 min-w-0 flex-1">
                         {order.outbound_order_items
                           ?.map((item) => item.order_item)
                           .filter(Boolean)
                           .join(", ") || "-"}
                       </div>
-                      <StatusBadge status={order.status} />
+                      <div className="shrink-0">
+                        <StatusBadge status={order.status} />
+                      </div>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm">
-                      <div className="text-muted-foreground text-xs">
-                        Customer
+
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                      <div className="text-muted-foreground text-xs">Customer</div>
+                      <div className="text-right text-xs truncate">
+                        {order.customers?.company_name || order.customers?.contact_person}
                       </div>
-                      <div className="text-right">
-                        {order.customers?.company_name ||
-                          order.customers?.contact_person}
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        Warehouse
-                      </div>
-                      <div className="text-right">
+
+                      <div className="text-muted-foreground text-xs">Warehouse</div>
+                      <div className="text-right text-xs truncate">
                         {order.warehouses?.warehouse_name}
                       </div>
+
                       <div className="text-muted-foreground text-xs">Type</div>
-                      <div className="text-right capitalize">
+                      <div className="text-right text-xs capitalize">
                         {order.order_type}
                       </div>
+
                       <div className="text-muted-foreground text-xs">Items</div>
-                      <div className="text-right">
+                      <div className="text-right text-xs">
                         {order.total_items} ({order.total_quantity})
                       </div>
-                      {/* <div className="text-muted-foreground text-xs">
-                        Item Names
-                      </div>
+
+                      <div className="text-muted-foreground text-xs">Dispatched</div>
                       <div className="text-right text-xs">
-                        {order.outbound_order_items
-                          ?.map((item) => item.order_item)
-                          .filter(Boolean)
-                          .join(", ") || "-"}
-                      </div> */}
-                      <div className="text-muted-foreground text-xs">
-                        Dispatched
+                        {new Date(order.requested_date).toLocaleDateString("en-GB")}
                       </div>
-                      <div className="text-right">
-                        {new Date(order.requested_date).toLocaleDateString()}
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        Charges
-                      </div>
-                      <div className="text-right font-medium">
+
+                      <div className="text-muted-foreground text-xs">Charges</div>
+                      <div className="text-right text-xs font-medium">
                         {formatCurrency(order.total_charges ?? 0)}
                       </div>
                     </div>
-                    <div 
+
+                    <div
                       className="mt-3 flex justify-end gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={(e) =>
-                          handleStatusChange(order.id, order.status, e)
-                        }
+                        onClick={(e) => handleStatusChange(order.id, order.status, e)}
                       >
                         <RefreshCw className="h-4 w-4 mr-1" /> Status
                       </Button>
@@ -520,9 +510,9 @@ export default function AdminOrders() {
 
               {/* Desktop: wide table */}
               <div className="hidden sm:block">
-                <div className="w-full overflow-x-auto pb-2">
+                <div className="w-full overflow-auto max-h-[calc(100vh-280px)] rounded-md border border-border">
                   <table className="w-full border-collapse text-sm">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-card">
                       <tr className="border-b border-border text-xs uppercase text-muted-foreground">
                         <th className="px-3 py-3 text-left font-medium">
                           Item Names
@@ -575,11 +565,18 @@ export default function AdminOrders() {
                           className="border-b border-border/60 last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors"
                           onClick={() => handleOrderClick(order.id)}
                         >
-                          <td className="px-3 py-3 font-medium whitespace-nowrap">
-                            {order.outbound_order_items
-                              ?.map((item) => item.order_item)
-                              .filter(Boolean)
-                              .join(", ") || "-"}
+                          <td className="px-3 py-3 font-medium max-w-[200px]">
+                            <span className="block truncate" title={
+                              order.outbound_order_items
+                                ?.map((item) => item.order_item)
+                                .filter(Boolean)
+                                .join(", ") || "-"
+                            }>
+                              {order.outbound_order_items
+                                ?.map((item) => item.order_item)
+                                .filter(Boolean)
+                                .join(", ") || "-"}
+                            </span>
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap">
                             {order.customers?.company_name ||
@@ -680,6 +677,15 @@ export default function AdminOrders() {
         onOpenChange={setDetailsDialogOpen}
         orderId={selectedOrderId}
         showCustomerInfo={true}
+        onStatusUpdate={(orderId, currentStatus) => {
+          setDetailsDialogOpen(false);
+          setSelectedOrder({ id: orderId, status: currentStatus });
+          setStatusDialogOpen(true);
+        }}
+        onDeleted={() => {
+          setDetailsDialogOpen(false);
+          fetchOrders();
+        }}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

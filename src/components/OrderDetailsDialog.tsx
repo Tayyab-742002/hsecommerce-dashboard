@@ -4,27 +4,43 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import Spinner from "@/components/Spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 import {
   Package,
   Calendar,
-  Building2,
   User,
   CreditCard,
   FileText,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 
 interface OrderDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orderId: string | null;
-  showCustomerInfo?: boolean; // For admin view, show customer info
+  showCustomerInfo?: boolean;
+  onStatusUpdate?: (orderId: string, currentStatus: string) => void;
+  onDeleted?: () => void;
 }
 
 interface OrderDetails {
@@ -64,9 +80,37 @@ export default function OrderDetailsDialog({
   onOpenChange,
   orderId,
   showCustomerInfo = false,
+  onStatusUpdate,
+  onDeleted,
 }: OrderDetailsDialogProps) {
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!orderId) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("outbound_orders")
+        .delete()
+        .eq("id", orderId);
+      if (error) throw error;
+      toast.success("Order deleted successfully");
+      setDeleteConfirmOpen(false);
+      onOpenChange(false);
+      onDeleted?.();
+    } catch (error: unknown) {
+      const message =
+        typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Failed to delete order";
+      toast.error(message);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (open && orderId) {
@@ -267,7 +311,7 @@ export default function OrderDetailsDialog({
                 <CardContent className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">
-                      Pick & Pack Charges:
+                      Handling Charges:
                     </span>
                     <span className="font-medium">
                       {formatCurrency(
@@ -409,7 +453,47 @@ export default function OrderDetailsDialog({
             Order details not found
           </div>
         )}
+
+        {/* Admin action footer */}
+        {showCustomerInfo && orderDetails && (
+          <DialogFooter className="flex gap-2 pt-2 border-t border-border">
+            <Button
+              variant="outline"
+              onClick={() => onStatusUpdate?.(orderDetails.id, orderDetails.status)}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Update Status
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteConfirmOpen(true)}
+              className="gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Order
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Order <span className="font-semibold">{orderDetails?.order_number}</span> will be
+              permanently deleted along with all its items. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
