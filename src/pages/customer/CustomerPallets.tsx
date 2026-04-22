@@ -23,7 +23,15 @@ interface Pallet {
   status: string;
   condition: string;
   received_date: string;
-  pallet_items: { id: string }[];
+  pallet_items: {
+    id: string;
+    quantity: number;
+    inventory_items: {
+      item_name: string | null;
+      sku: string | null;
+      item_code: string | null;
+    } | null;
+  }[];
 }
 
 export default function CustomerPallets() {
@@ -52,7 +60,11 @@ export default function CustomerPallets() {
           status,
           condition,
           received_date,
-          pallet_items (id)
+          pallet_items (
+            id,
+            quantity,
+            inventory_items (item_name, sku, item_code)
+          )
         `)
         .eq("customer_id", customerId)
         .order("received_date", { ascending: false });
@@ -78,6 +90,22 @@ export default function CustomerPallets() {
 
   const statusLabel = (s: string) =>
     s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const formatPalletItems = (items: Pallet["pallet_items"]) => {
+    if (!items.length) return "—";
+
+    const labels = items
+      .map((item) => item.inventory_items?.item_name || item.inventory_items?.sku || item.inventory_items?.item_code)
+      .filter((label): label is string => Boolean(label));
+
+    if (!labels.length) return `${items.length} item${items.length > 1 ? "s" : ""}`;
+
+    const uniqueLabels = Array.from(new Set(labels));
+    const preview = uniqueLabels.slice(0, 2).join(", ");
+    const remaining = uniqueLabels.length - 2;
+
+    return remaining > 0 ? `${preview} +${remaining} more` : preview;
+  };
 
   const inStorage = pallets.filter((p) => p.status === "in_storage").length;
   const partiallyPicked = pallets.filter((p) => p.status === "partially_picked").length;
@@ -207,7 +235,7 @@ export default function CustomerPallets() {
                     <div className="text-muted-foreground text-xs">Container</div>
                     <div className="text-right">{pallet.container_number || "—"}</div>
                     <div className="text-muted-foreground text-xs">Items</div>
-                    <div className="text-right">{pallet.pallet_items.length} SKUs</div>
+                    <div className="text-right">{formatPalletItems(pallet.pallet_items)}</div>
                     <div className="text-muted-foreground text-xs">Arrived</div>
                     <div className="text-right">
                       {new Date(pallet.received_date).toLocaleDateString("en-GB")}
@@ -238,7 +266,7 @@ export default function CustomerPallets() {
                   <tr className="border-b border-border text-xs uppercase text-muted-foreground">
                     <th className="px-3 py-3 text-left font-medium">Pallet No.</th>
                     <th className="px-3 py-3 text-left font-medium">Container</th>
-                    <th className="px-3 py-3 text-left font-medium">SKUs</th>
+                    <th className="px-3 py-3 text-left font-medium">Items</th>
                     <th className="px-3 py-3 text-left font-medium">Condition</th>
                     <th className="px-3 py-3 text-left font-medium">Status</th>
                     <th className="px-3 py-3 text-left font-medium">Arrived</th>
@@ -270,8 +298,8 @@ export default function CustomerPallets() {
                         <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
                           {pallet.container_number || "—"}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          {pallet.pallet_items.length}
+                        <td className="px-3 py-3 max-w-[260px] truncate">
+                          {formatPalletItems(pallet.pallet_items)}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap capitalize">
                           {pallet.condition.replace(/_/g, " ")}

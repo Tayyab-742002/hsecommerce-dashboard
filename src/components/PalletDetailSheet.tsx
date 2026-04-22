@@ -168,7 +168,7 @@ export default function PalletDetailSheet({
                 <>
                   <span className="text-muted-foreground">Storage Charges</span>
                   <span className="font-medium text-right">
-                    £{pallet.storage_charges.toFixed(2)}
+                    £{pallet.storage_charges.toFixed(2)}/mo
                   </span>
                 </>
               )}

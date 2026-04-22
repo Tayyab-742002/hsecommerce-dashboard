@@ -104,12 +104,14 @@ export type Database = {
           item_code: string
           item_name: string
           notes: string | null
+          pallet_id: string | null
           qr_code: string | null
           quantity: number
           received_date: string
           sku: string | null
           status: string | null
           storage_rate: number | null
+          total_quantity: number | null
           unit_of_measure: string | null
           updated_at: string | null
           warehouse_id: string
@@ -133,12 +135,14 @@ export type Database = {
           item_code: string
           item_name: string
           notes?: string | null
+          pallet_id?: string | null
           qr_code?: string | null
           quantity?: number
           received_date: string
           sku?: string | null
           status?: string | null
           storage_rate?: number | null
+          total_quantity?: number | null
           unit_of_measure?: string | null
           updated_at?: string | null
           warehouse_id: string
@@ -162,12 +166,14 @@ export type Database = {
           item_code?: string
           item_name?: string
           notes?: string | null
+          pallet_id?: string | null
           qr_code?: string | null
           quantity?: number
           received_date?: string
           sku?: string | null
           status?: string | null
           storage_rate?: number | null
+          total_quantity?: number | null
           unit_of_measure?: string | null
           updated_at?: string | null
           warehouse_id?: string
@@ -184,6 +190,118 @@ export type Database = {
           },
           {
             foreignKeyName: "inventory_items_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_pallet_id_fkey"
+            columns: ["pallet_id"]
+            isOneToOne: false
+            referencedRelation: "pallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pallet_items: {
+        Row: {
+          id: string
+          pallet_id: string
+          inventory_item_id: string
+          quantity: number
+          notes: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          pallet_id: string
+          inventory_item_id: string
+          quantity?: number
+          notes?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          pallet_id?: string
+          inventory_item_id?: string
+          quantity?: number
+          notes?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pallet_items_pallet_id_fkey"
+            columns: ["pallet_id"]
+            isOneToOne: false
+            referencedRelation: "pallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_items_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pallets: {
+        Row: {
+          id: string
+          pallet_number: string
+          container_number: string | null
+          customer_id: string
+          warehouse_id: string
+          location: string | null
+          status: string
+          condition: string
+          storage_charges: number
+          notes: string | null
+          received_date: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          pallet_number: string
+          container_number?: string | null
+          customer_id: string
+          warehouse_id: string
+          location?: string | null
+          status?: string
+          condition?: string
+          storage_charges?: number
+          notes?: string | null
+          received_date?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          pallet_number?: string
+          container_number?: string | null
+          customer_id?: string
+          warehouse_id?: string
+          location?: string | null
+          status?: string
+          condition?: string
+          storage_charges?: number
+          notes?: string | null
+          received_date?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pallets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallets_warehouse_id_fkey"
             columns: ["warehouse_id"]
             isOneToOne: false
             referencedRelation: "warehouses"

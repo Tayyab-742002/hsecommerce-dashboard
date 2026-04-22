@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Package, Search } from "lucide-react";
+import { Plus, Trash2, Package, Search, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -155,6 +155,7 @@ export default function ReceivePalletsDialog({
   // Step 2
   const [pallets, setPallets] = useState<PalletDraft[]>([]);
   const [showAddPallet, setShowAddPallet] = useState(false);
+  const [editingTempId, setEditingTempId] = useState<string | null>(null);
   const [newLocation, setNewLocation] = useState("");
   const [newCondition, setNewCondition] = useState("good");
   const [newStorageCharges, setNewStorageCharges] = useState<string>("");
@@ -163,7 +164,7 @@ export default function ReceivePalletsDialog({
 
   // Data
   const [customers, setCustomers] = useState<{ id: string; label: string }[]>([]);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<{ id: string; warehouse_name: string }[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -197,6 +198,7 @@ export default function ReceivePalletsDialog({
     setReceivedDate(new Date().toISOString().split("T")[0]);
     setPallets([]);
     setShowAddPallet(false);
+    setEditingTempId(null);
     resetNewPalletForm();
   };
 
@@ -238,6 +240,38 @@ export default function ReceivePalletsDialog({
     setShowAddPallet(false);
     resetNewPalletForm();
     toast.success("Pallet added");
+  };
+
+  const handleEditPallet = (p: PalletDraft) => {
+    setEditingTempId(p.tempId);
+    setShowAddPallet(false);
+    setNewLocation(p.location);
+    setNewCondition(p.condition);
+    setNewStorageCharges(p.storage_charges > 0 ? String(p.storage_charges) : "");
+    setNewNotes(p.notes);
+    setNewItems(p.items.length > 0 ? p.items : [newItemRow()]);
+  };
+
+  const handleUpdatePallet = () => {
+    if (!newLocation.trim()) { toast.error("Please enter a location for this pallet"); return; }
+    const validItems = newItems.filter((r) => r.item_name.trim() && r.quantity > 0);
+    setPallets((prev) =>
+      prev.map((p) =>
+        p.tempId === editingTempId
+          ? {
+              ...p,
+              location: newLocation.trim(),
+              condition: newCondition,
+              storage_charges: parseFloat(newStorageCharges) || 0,
+              notes: newNotes.trim(),
+              items: validItems,
+            }
+          : p
+      )
+    );
+    setEditingTempId(null);
+    resetNewPalletForm();
+    toast.success("Pallet updated");
   };
 
   const handleConfirmReceipt = async () => {
@@ -401,34 +435,151 @@ export default function ReceivePalletsDialog({
             {pallets.length > 0 && (
               <div className="space-y-2">
                 {pallets.map((p, idx) => (
-                  <div
-                    key={p.tempId}
-                    className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <div>
-                        <span className="font-medium">Pallet {idx + 1}</span>
-                        <span className="text-muted-foreground ml-2">{p.location}</span>
-                        {p.items.length > 0 && (
-                          <span className="text-muted-foreground ml-2">
-                            · {p.items.length} item{p.items.length > 1 ? "s" : ""}
-                          </span>
-                        )}
-                        {p.storage_charges > 0 && (
-                          <span className="text-muted-foreground ml-2">
-                            · £{p.storage_charges.toFixed(2)}/wk
-                          </span>
-                        )}
+                  <div key={p.tempId}>
+                    {editingTempId === p.tempId ? (
+                      /* ── Inline edit form ── */
+                      <Card className="border-dashed border-primary/40">
+                        <CardContent className="pt-4 space-y-4">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium">Edit Pallet {idx + 1}</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Location <span className="text-destructive">*</span></Label>
+                              <Input
+                                placeholder="e.g. Row B, Bay 3"
+                                value={newLocation}
+                                onChange={(e) => setNewLocation(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Condition</Label>
+                              <Select value={newCondition} onValueChange={setNewCondition}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="good">Good</SelectItem>
+                                  <SelectItem value="damaged">Damaged</SelectItem>
+                                  <SelectItem value="water_damaged">Water Damaged</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label>Storage Charges (£/mo)</Label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">£</span>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                placeholder="0.00"
+                                value={newStorageCharges}
+                                onChange={(e) => setNewStorageCharges(e.target.value)}
+                                className="pl-7"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                            <Textarea
+                              placeholder="Any notes about this pallet..."
+                              value={newNotes}
+                              onChange={(e) => setNewNotes(e.target.value)}
+                              rows={2}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <Label>Items on this pallet</Label>
+                                <p className="text-xs text-muted-foreground mt-0.5">Enter items from the supplier's packing list</p>
+                              </div>
+                              <Button type="button" variant="outline" size="sm" onClick={() => setNewItems((prev) => [...prev, newItemRow()])}>
+                                <Plus className="h-3 w-3 mr-1" />Add Row
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-[1fr_120px_70px_80px_32px] gap-2 px-1">
+                              <span className="text-xs font-medium text-muted-foreground">Item Name *</span>
+                              <span className="text-xs font-medium text-muted-foreground">SKU / Code</span>
+                              <span className="text-xs font-medium text-muted-foreground">Qty *</span>
+                              <span className="text-xs font-medium text-muted-foreground">Unit</span>
+                              <span />
+                            </div>
+                            {newItems.map((row) => (
+                              <div key={row.tempId} className="grid grid-cols-[1fr_120px_70px_80px_32px] gap-2 items-center">
+                                <Input placeholder="e.g. Nike Air Max" value={row.item_name} onChange={(e) => updateItem(row.tempId, "item_name", e.target.value)} />
+                                <Input placeholder="e.g. NAM-001" value={row.sku} onChange={(e) => updateItem(row.tempId, "sku", e.target.value)} />
+                                <Input type="number" min={1} value={row.quantity} onChange={(e) => updateItem(row.tempId, "quantity", parseInt(e.target.value) || 1)} />
+                                <Select value={row.unit_of_measure} onValueChange={(v) => updateItem(row.tempId, "unit_of_measure", v)}>
+                                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pcs">pcs</SelectItem>
+                                    <SelectItem value="boxes">boxes</SelectItem>
+                                    <SelectItem value="kg">kg</SelectItem>
+                                    <SelectItem value="pairs">pairs</SelectItem>
+                                    <SelectItem value="units">units</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeItem(row.tempId)} disabled={newItems.length === 1}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex gap-2 justify-end pt-1">
+                            <Button variant="outline" size="sm" onClick={() => { setEditingTempId(null); resetNewPalletForm(); }}>
+                              Cancel
+                            </Button>
+                            <Button size="sm" onClick={handleUpdatePallet}>
+                              Save Changes
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      /* ── Collapsed row ── */
+                      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                        <div className="flex items-center gap-3">
+                          <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div>
+                            <span className="font-medium">Pallet {idx + 1}</span>
+                            <span className="text-muted-foreground ml-2">{p.location}</span>
+                            {p.items.length > 0 && (
+                              <span className="text-muted-foreground ml-2">
+                                · {p.items.length} item{p.items.length > 1 ? "s" : ""}
+                              </span>
+                            )}
+                            {p.storage_charges > 0 && (
+                              <span className="text-muted-foreground ml-2">
+                                · £{p.storage_charges.toFixed(2)}/mo
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditPallet(p)}
+                            disabled={showAddPallet || (editingTempId !== null && editingTempId !== p.tempId)}
+                          >
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPallets((prev) => prev.filter((x) => x.tempId !== p.tempId))}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPallets((prev) => prev.filter((x) => x.tempId !== p.tempId))}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -463,7 +614,7 @@ export default function ReceivePalletsDialog({
 
                   {/* Storage Charges */}
                   <div className="space-y-1.5">
-                    <Label>Storage Charges (£)</Label>
+                    <Label>Storage Charges (£/mo)</Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">£</span>
                       <Input

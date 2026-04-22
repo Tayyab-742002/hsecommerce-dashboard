@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Search, Plus, Eye, Filter, X, Pencil } from "lucide-react";
 import ReceivePalletsDialog from "@/components/ReceivePalletsDialog";
 import PalletDetailSheet from "@/components/PalletDetailSheet";
+import EditPalletDialog from "@/components/EditPalletDialog";
 import { toast } from "sonner";
 import Spinner from "@/components/Spinner";
 import {
@@ -26,14 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+
 
 interface Pallet {
   id: string;
@@ -49,7 +43,15 @@ interface Pallet {
   warehouse_id: string;
   customers: { company_name: string | null; contact_person: string } | null;
   warehouses: { warehouse_name: string } | null;
-  pallet_items: { id: string }[];
+  pallet_items: {
+    id: string;
+    quantity: number;
+    inventory_items: {
+      item_name: string | null;
+      sku: string | null;
+      item_code: string | null;
+    } | null;
+  }[];
 }
 
 export default function AdminPallets() {
@@ -68,10 +70,9 @@ export default function AdminPallets() {
   const [palletToDelete, setPalletToDelete] = useState<string | null>(null);
   const [inventoryItemCount, setInventoryItemCount] = useState(0);
 
-  // Edit location dialog
-  const [editLocationOpen, setEditLocationOpen] = useState(false);
-  const [editLocationValue, setEditLocationValue] = useState("");
-  const [editLocationPalletId, setEditLocationPalletId] = useState<string | null>(null);
+  // Edit pallet dialog
+  const [editPalletOpen, setEditPalletOpen] = useState(false);
+  const [editPalletId, setEditPalletId] = useState<string | null>(null);
 
   const fetchPallets = useCallback(async () => {
     try {
@@ -81,7 +82,11 @@ export default function AdminPallets() {
           *,
           customers (company_name, contact_person),
           warehouses (warehouse_name),
-          pallet_items (id)
+          pallet_items (
+            id,
+            quantity,
+            inventory_items (item_name, sku, item_code)
+          )
         `)
         .order("created_at", { ascending: false });
 
@@ -139,31 +144,9 @@ export default function AdminPallets() {
     setDetailOpen(true);
   };
 
-  const handleEditLocation = (pallet: Pallet) => {
-    setEditLocationPalletId(pallet.id);
-    setEditLocationValue(pallet.location || "");
-    setEditLocationOpen(true);
-  };
-
-  const handleSaveLocation = async () => {
-    if (!editLocationPalletId) return;
-    try {
-      const { error } = await supabase
-        .from("pallets")
-        .update({ location: editLocationValue.trim() || null })
-        .eq("id", editLocationPalletId);
-
-      if (error) throw error;
-      toast.success("Location updated");
-      setEditLocationOpen(false);
-      fetchPallets();
-    } catch (error: unknown) {
-      const message =
-        typeof error === "object" && error !== null && "message" in error
-          ? String((error as { message: unknown }).message)
-          : "Failed to update location";
-      toast.error(message);
-    }
+  const handleEditPallet = (pallet: Pallet) => {
+    setEditPalletId(pallet.id);
+    setEditPalletOpen(true);
   };
 
   const openDeleteDialog = async (palletId: string) => {
@@ -217,6 +200,22 @@ export default function AdminPallets() {
 
   const statusLabel = (s: string) =>
     s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const formatPalletItems = (items: Pallet["pallet_items"]) => {
+    if (!items.length) return "—";
+
+    const labels = items
+      .map((item) => item.inventory_items?.item_name || item.inventory_items?.sku || item.inventory_items?.item_code)
+      .filter((label): label is string => Boolean(label));
+
+    if (!labels.length) return `${items.length} item${items.length > 1 ? "s" : ""}`;
+
+    const uniqueLabels = Array.from(new Set(labels));
+    const preview = uniqueLabels.slice(0, 2).join(", ");
+    const remaining = uniqueLabels.length - 2;
+
+    return remaining > 0 ? `${preview} +${remaining} more` : preview;
+  };
 
   return (
     <div className="space-y-6">
@@ -342,10 +341,10 @@ export default function AdminPallets() {
                     <div className="text-muted-foreground text-xs">Location</div>
                     <div className="text-right">{pallet.location || "—"}</div>
                     <div className="text-muted-foreground text-xs">Items</div>
-                    <div className="text-right">{pallet.pallet_items.length} SKUs</div>
+                    <div className="text-right">{formatPalletItems(pallet.pallet_items)}</div>
                     <div className="text-muted-foreground text-xs">Storage Charges</div>
                     <div className="text-right">
-                      {pallet.storage_charges > 0 ? `£${pallet.storage_charges.toFixed(2)}` : "—"}
+                      {pallet.storage_charges > 0 ? `£${pallet.storage_charges.toFixed(2)}/mo` : "—"}
                     </div>
                     <div className="text-muted-foreground text-xs">Received</div>
                     <div className="text-right">
@@ -356,7 +355,7 @@ export default function AdminPallets() {
                     <Button size="sm" variant="outline" onClick={() => handleViewDetail(pallet.id)}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleEditLocation(pallet)}>
+                    <Button size="sm" variant="outline" onClick={() => handleEditPallet(pallet)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </div>
@@ -375,9 +374,9 @@ export default function AdminPallets() {
                     <th className="px-3 py-3 text-left font-medium">Customer</th>
                     <th className="px-3 py-3 text-left font-medium">Container</th>
                     <th className="px-3 py-3 text-left font-medium">Location</th>
-                    <th className="px-3 py-3 text-left font-medium">SKUs</th>
+                    <th className="px-3 py-3 text-left font-medium">Items</th>
                     <th className="px-3 py-3 text-left font-medium">Condition</th>
-                    <th className="px-3 py-3 text-left font-medium">Storage Charges</th>
+                    <th className="px-3 py-3 text-left font-medium">Charges (£/mo)</th>
                     <th className="px-3 py-3 text-left font-medium">Status</th>
                     <th className="px-3 py-3 text-left font-medium">Received</th>
                     <th className="px-3 py-3 text-left font-medium">Actions</th>
@@ -414,14 +413,14 @@ export default function AdminPallets() {
                         <td className="px-3 py-3 whitespace-nowrap">
                           {pallet.location || "—"}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          {pallet.pallet_items.length}
+                        <td className="px-3 py-3 max-w-[260px] truncate">
+                          {formatPalletItems(pallet.pallet_items)}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap capitalize">
                           {pallet.condition.replace(/_/g, " ")}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
-                          {pallet.storage_charges > 0 ? `£${pallet.storage_charges.toFixed(2)}` : "—"}
+                          {pallet.storage_charges > 0 ? `£${pallet.storage_charges.toFixed(2)}/mo` : "—"}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           <StatusBadge status={statusLabel(pallet.status)} />
@@ -441,7 +440,7 @@ export default function AdminPallets() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleEditLocation(pallet)}
+                              onClick={() => handleEditPallet(pallet)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -479,29 +478,13 @@ export default function AdminPallets() {
         showLocation={true}
       />
 
-      {/* Edit Location Dialog */}
-      <Dialog open={editLocationOpen} onOpenChange={setEditLocationOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Update Location</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label>Location</Label>
-            <Input
-              placeholder="e.g. Row B, Bay 3"
-              value={editLocationValue}
-              onChange={(e) => setEditLocationValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSaveLocation()}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditLocationOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveLocation}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Pallet Dialog */}
+      <EditPalletDialog
+        open={editPalletOpen}
+        onOpenChange={setEditPalletOpen}
+        palletId={editPalletId}
+        onSuccess={fetchPallets}
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
