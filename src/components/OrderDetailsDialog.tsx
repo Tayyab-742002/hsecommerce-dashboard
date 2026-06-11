@@ -71,6 +71,7 @@ interface OrderDetails {
   outbound_order_items: Array<{
     order_item: string;
     quantity: number;
+    unit_price: number | null;
     inventory_item_id: string;
   }>;
 }
@@ -129,13 +130,13 @@ export default function OrderDetailsDialog({
         ? `
           *,
           warehouses (warehouse_name, warehouse_code),
-          outbound_order_items (order_item, quantity, inventory_item_id),
+          outbound_order_items (order_item, quantity, unit_price, inventory_item_id),
           customers (company_name, contact_person, email, phone)
         `
         : `
           *,
           warehouses (warehouse_name, warehouse_code),
-          outbound_order_items (order_item, quantity, inventory_item_id)
+          outbound_order_items (order_item, quantity, unit_price, inventory_item_id)
         `;
 
       const { data, error } = await supabase
@@ -309,6 +310,24 @@ export default function OrderDetailsDialog({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {orderDetails.outbound_order_items?.some(
+                    (item) => (item.unit_price ?? 0) !== 0
+                  ) && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        Items Subtotal:
+                      </span>
+                      <span className="font-medium">
+                        {formatCurrency(
+                          orderDetails.outbound_order_items.reduce(
+                            (sum, item) =>
+                              sum + item.quantity * (item.unit_price ?? 0),
+                            0
+                          )
+                        )}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">
                       Handling Charges:
@@ -366,6 +385,12 @@ export default function OrderDetailsDialog({
                               <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
                                 Quantity
                               </th>
+                              <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                                Unit Price
+                              </th>
+                              <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                                Line Total
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -381,6 +406,14 @@ export default function OrderDetailsDialog({
                                   <td className="px-4 py-3 text-right">
                                     {item.quantity}
                                   </td>
+                                  <td className="px-4 py-3 text-right">
+                                    {formatCurrency(item.unit_price ?? 0)}
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-medium">
+                                    {formatCurrency(
+                                      item.quantity * (item.unit_price ?? 0)
+                                    )}
+                                  </td>
                                 </tr>
                               )
                             )}
@@ -394,14 +427,26 @@ export default function OrderDetailsDialog({
                           (item, index) => (
                             <div
                               key={index}
-                              className="flex justify-between items-center p-3 border border-border rounded-lg"
+                              className="p-3 border border-border rounded-lg space-y-1"
                             >
-                              <span className="font-medium">
-                                {item.order_item || "-"}
-                              </span>
-                              <span className="text-muted-foreground">
-                                Qty: {item.quantity}
-                              </span>
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium">
+                                  {item.order_item || "-"}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  Qty: {item.quantity}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                                <span>
+                                  {formatCurrency(item.unit_price ?? 0)} / unit
+                                </span>
+                                <span className="font-medium text-foreground">
+                                  {formatCurrency(
+                                    item.quantity * (item.unit_price ?? 0)
+                                  )}
+                                </span>
+                              </div>
                             </div>
                           )
                         )}
