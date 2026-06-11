@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
+import { createOrder } from "@/lib/createOrder";
 
 interface OrderWizardProps {
   onComplete: () => void;
@@ -25,6 +26,7 @@ interface OrderWizardProps {
 interface OrderItem {
   inventory_item_id: string;
   quantity?: number;
+  unit_price?: number;
   item_name: string;
   available_quantity: number;
   pallet_id?: string | null;
@@ -115,6 +117,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       {
         inventory_item_id: "",
         quantity: 1,
+        unit_price: 0,
         item_name: "",
         available_quantity: 0,
         pallet_id: null,
@@ -143,6 +146,21 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
     setOrderItems(newItems);
   };
 
+  // Stock remaining for an inventory item after subtracting what other rows
+  // of this order already request (the same product can appear in several rows)
+  const remainingFor = (inventoryItemId: string, excludeIndex?: number) => {
+    const inv = inventory.find((i) => i.id === inventoryItemId);
+    if (!inv) return 0;
+    const usedElsewhere = orderItems.reduce(
+      (sum, item, i) =>
+        i !== excludeIndex && item.inventory_item_id === inventoryItemId
+          ? sum + (item.quantity ?? 0)
+          : sum,
+      0
+    );
+    return inv.quantity - usedElsewhere;
+  };
+
   const handleSubmit = async () => {
     if (orderItems.length === 0) {
       toast({
@@ -153,118 +171,75 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       return;
     }
 
-    const invalidItem = orderItems.find(
-      (item) => (item.quantity ?? 0) > item.available_quantity || !item.quantity || item.quantity < 1
-    );
-    if (invalidItem) {
+    const unselectedItem = orderItems.some((item) => !item.inventory_item_id);
+    if (unselectedItem) {
       toast({
         title: "Error",
-        description: `Quantity exceeds available stock for ${invalidItem.item_name}`,
+        description: "Please select an item for every row, or remove empty rows",
         variant: "destructive",
       });
       return;
     }
 
-    const totalQuantity = orderItems.reduce(
-      (sum, item) => sum + (item.quantity ?? 0),
-      0
+    const invalidQuantity = orderItems.find(
+      (item) => !item.quantity || item.quantity < 1
     );
-    const pickAndPackRate = orderData.pick_and_pack_rate ?? 0;
-    const totalCharges = pickAndPackRate * totalQuantity;
+    if (invalidQuantity) {
+      toast({
+        title: "Error",
+        description: `Quantity must be at least 1 for ${invalidQuantity.item_name}`,
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const orderNumber = `OUT-${new Date().getFullYear()}-${String(
-      Math.floor(Math.random() * 10000)
-    ).padStart(5, "0")}`;
+    // Validate stock per product, summed across all rows that reference it
+    for (const inv of inventory) {
+      const requested = orderItems.reduce(
+        (sum, item) =>
+          item.inventory_item_id === inv.id ? sum + (item.quantity ?? 0) : sum,
+        0
+      );
+      if (requested > inv.quantity) {
+        toast({
+          title: "Error",
+          description: `Insufficient stock for ${inv.item_name}: available ${inv.quantity}, requested ${requested}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
 
-    const { data: order, error: orderError } = await supabase
-      .from("outbound_orders")
-      .insert({
+    try {
+      const orderNumber = await createOrder({
         customer_id: orderData.customer_id,
         warehouse_id: orderData.warehouse_id,
         order_type: orderData.order_type,
         requested_date: orderData.requested_date,
         special_instructions: orderData.special_instructions || null,
-        handling_charges: totalCharges,
-        delivery_charges: 0,
-        order_number: orderNumber,
-        total_items: orderItems.length,
-        total_quantity: totalQuantity,
-        total_charges: totalCharges,
-        status: "pending",
-      })
-      .select()
-      .single();
-
-    if (orderError) {
-      toast({
-        title: "Error",
-        description: "Failed to create order",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const { error: itemsError } = await supabase
-      .from("outbound_order_items")
-      .insert(
-        orderItems.map((item) => ({
-          outbound_order_id: order.id,
+        pick_and_pack_rate: orderData.pick_and_pack_rate ?? 0,
+        items: orderItems.map((item) => ({
           inventory_item_id: item.inventory_item_id,
           quantity: item.quantity ?? 1,
-          order_item: item.item_name,
-        }))
-      );
+          unit_price: item.unit_price ?? 0,
+          item_name: item.item_name,
+          pallet_id: item.pallet_id,
+        })),
+      });
 
-    if (itemsError) {
+      toast({
+        title: "Success",
+        description: `Order ${orderNumber} created successfully`,
+      });
+      onComplete();
+    } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add order items",
+        description:
+          error instanceof Error ? error.message : "Failed to create order",
         variant: "destructive",
       });
-      return;
     }
-
-    // Decrement pallet_items quantities for pallet-sourced items
-    const palletOrderItems = orderItems.filter((item) => item.pallet_id);
-    for (const item of palletOrderItems) {
-      const { data: palletItemRow } = await supabase
-        .from("pallet_items")
-        .select("id, quantity")
-        .eq("pallet_id", item.pallet_id!)
-        .eq("inventory_item_id", item.inventory_item_id)
-        .single();
-
-      if (palletItemRow) {
-        const newQty = Math.max(0, palletItemRow.quantity - (item.quantity ?? 0));
-        await supabase
-          .from("pallet_items")
-          .update({ quantity: newQty })
-          .eq("id", palletItemRow.id);
-
-        // Update pallet status based on remaining quantities across all its items
-        const { data: remainingItems } = await supabase
-          .from("pallet_items")
-          .select("quantity")
-          .eq("pallet_id", item.pallet_id!);
-
-        if (remainingItems) {
-          const totalRemaining = remainingItems.reduce(
-            (sum, r) => sum + (r.quantity ?? 0),
-            0
-          );
-          await supabase
-            .from("pallets")
-            .update({ status: totalRemaining <= 0 ? "empty" : "partially_picked" })
-            .eq("id", item.pallet_id!);
-        }
-      }
-    }
-
-    toast({
-      title: "Success",
-      description: `Order ${orderNumber} created successfully`,
-    });
-    onComplete();
   };
 
   const hasPalletItems = orderItems.some((item) => item.pallet_id);
@@ -437,18 +412,26 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                         {inventory.map((inv) => (
                           <SelectItem key={inv.id} value={inv.id}>
                             {inv.item_name} ({inv.item_code}) - Available:{" "}
-                            {inv.quantity}
+                            {remainingFor(inv.id, index)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {item.inventory_item_id &&
+                      (item.quantity ?? 0) >
+                        remainingFor(item.inventory_item_id, index) && (
+                        <p className="text-xs text-destructive">
+                          Only {remainingFor(item.inventory_item_id, index)}{" "}
+                          available — other rows in this order use the rest
+                        </p>
+                      )}
                   </div>
                   <div className="w-full space-y-2 md:w-32">
                     <Label>Quantity</Label>
                     <Input
                       type="number"
                       min="1"
-                      max={item.available_quantity}
+                      max={remainingFor(item.inventory_item_id, index)}
                       value={item.quantity ?? ""}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -462,6 +445,29 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                         const value = e.target.value;
                         if (value === "" || parseInt(value) < 1) {
                           updateOrderItem(index, "quantity", 1);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="w-full space-y-2 md:w-32">
+                    <Label>Unit Price (GBP)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.unit_price ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        updateOrderItem(
+                          index,
+                          "unit_price",
+                          value === "" ? undefined : parseFloat(value)
+                        );
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        if (value === "" || isNaN(parseFloat(value))) {
+                          updateOrderItem(index, "unit_price", 0);
                         }
                       }}
                     />
@@ -571,6 +577,28 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
             <div className="border-t pt-4">
               <h3 className="font-semibold mb-2">Order Summary</h3>
               <div className="space-y-1 text-sm">
+                {orderItems.map((item, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span className="truncate pr-2">
+                      {item.item_name || "Item"} × {item.quantity ?? 0}
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency((item.quantity ?? 0) * (item.unit_price ?? 0))}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between border-t pt-2 mt-2">
+                  <span>Items Subtotal:</span>
+                  <span className="font-medium">
+                    {formatCurrency(
+                      orderItems.reduce(
+                        (sum, item) =>
+                          sum + (item.quantity ?? 0) * (item.unit_price ?? 0),
+                        0
+                      )
+                    )}
+                  </span>
+                </div>
                 <div className="flex justify-between">
                   <span>Total Items:</span>
                   <span className="font-medium">{orderItems.length}</span>
@@ -591,8 +619,16 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                   <span>Total Charges:</span>
                   <span>
                     {formatCurrency(
-                      (orderData.pick_and_pack_rate ?? 0) *
-                        orderItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
+                      orderItems.reduce(
+                        (sum, item) =>
+                          sum + (item.quantity ?? 0) * (item.unit_price ?? 0),
+                        0
+                      ) +
+                        (orderData.pick_and_pack_rate ?? 0) *
+                          orderItems.reduce(
+                            (sum, item) => sum + (item.quantity ?? 0),
+                            0
+                          )
                     )}
                   </span>
                 </div>

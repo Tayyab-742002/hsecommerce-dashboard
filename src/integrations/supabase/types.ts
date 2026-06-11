@@ -315,24 +315,30 @@ export type Database = {
           id: string
           inventory_item_id: string
           notes: string | null
+          order_item: string | null
           outbound_order_id: string
           quantity: number
+          unit_price: number
         }
         Insert: {
           created_at?: string | null
           id?: string
           inventory_item_id: string
           notes?: string | null
+          order_item?: string | null
           outbound_order_id: string
           quantity: number
+          unit_price?: number
         }
         Update: {
           created_at?: string | null
           id?: string
           inventory_item_id?: string
           notes?: string | null
+          order_item?: string | null
           outbound_order_id?: string
           quantity?: number
+          unit_price?: number
         }
         Relationships: [
           {

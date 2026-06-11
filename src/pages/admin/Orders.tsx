@@ -28,6 +28,7 @@ import {
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import OrderWizard from "@/components/OrderWizard";
+import BatchOrderWizard from "@/components/BatchOrderWizard";
 import OrderStatusDialog from "@/components/OrderStatusDialog";
 import OrderDetailsDialog from "@/components/OrderDetailsDialog";
 import { toast } from "sonner";
@@ -76,6 +77,7 @@ export default function AdminOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<{
     id: string;
@@ -270,10 +272,29 @@ export default function AdminOrders() {
             Manage outbound orders and deliveries
           </p>
         </div>
-        <div className="w-full sm:w-auto">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Batch Orders
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create Batch Orders</DialogTitle>
+              </DialogHeader>
+              <BatchOrderWizard
+                onComplete={() => {
+                  setBatchDialogOpen(false);
+                  fetchOrders();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full">
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Order
               </Button>
