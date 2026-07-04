@@ -322,12 +322,17 @@ export default function BatchOrderWizard({ onComplete }: BatchOrderWizardProps) 
       0
     );
 
+  const orderQuantity = (order: BatchOrder) =>
+    order.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+
   const orderTotal = (order: BatchOrder) =>
-    orderSubtotal(order) +
-    (order.pick_and_pack_rate ?? 0) *
-      order.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+    orderSubtotal(order) + (order.pick_and_pack_rate ?? 0) * orderQuantity(order);
 
   const batchTotal = orders.reduce((sum, order) => sum + orderTotal(order), 0);
+  const batchQuantity = orders.reduce(
+    (sum, order) => sum + orderQuantity(order),
+    0
+  );
 
   const validateBatch = (): string | null => {
     if (!customerId || !warehouseId) return "Select a customer and warehouse first";
@@ -516,7 +521,8 @@ export default function BatchOrderWizard({ onComplete }: BatchOrderWizardProps) 
                           const count = order.items.filter(
                             (i) => i.inventory_item_id
                           ).length;
-                          return `${count} item${count === 1 ? "" : "s"}`;
+                          const qty = orderQuantity(order);
+                          return `${count} item${count === 1 ? "" : "s"} · ${qty} unit${qty === 1 ? "" : "s"}`;
                         })()}{" "}
                         · {formatCurrency(orderTotal(order))}
                       </span>
@@ -774,9 +780,19 @@ export default function BatchOrderWizard({ onComplete }: BatchOrderWizardProps) 
                         </CollapsibleContent>
                       </Collapsible>
 
-                      <div className="flex justify-between border-t pt-3 text-sm font-semibold">
-                        <span>Order Total:</span>
-                        <span>{formatCurrency(orderTotal(order))}</span>
+                      <div className="space-y-1 border-t pt-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Total Quantity:
+                          </span>
+                          <span className="font-medium">
+                            {orderQuantity(order)} units
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-semibold">
+                          <span>Order Total:</span>
+                          <span>{formatCurrency(orderTotal(order))}</span>
+                        </div>
                       </div>
                     </CardContent>
                   )}
@@ -795,8 +811,14 @@ export default function BatchOrderWizard({ onComplete }: BatchOrderWizardProps) 
           </Button>
 
           <div className="sticky bottom-0 -mx-6 -mb-6 flex flex-col gap-2 border-t bg-background px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-lg font-bold">
-              Batch Total: {formatCurrency(batchTotal)}
+            <div>
+              <div className="text-lg font-bold">
+                Batch Total: {formatCurrency(batchTotal)}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {orders.length} order{orders.length === 1 ? "" : "s"} ·{" "}
+                {batchQuantity} unit{batchQuantity === 1 ? "" : "s"}
+              </div>
             </div>
             <Button
               onClick={handleSubmitAll}
