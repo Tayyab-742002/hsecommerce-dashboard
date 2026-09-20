@@ -32,7 +32,10 @@ import {
   FileText,
   RefreshCw,
   Trash2,
+  Download,
+  ExternalLink,
 } from "lucide-react";
+import { downloadLabel, labelPreviewUrl, removeLabel } from "@/lib/labels";
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -57,6 +60,8 @@ interface OrderDetails {
   delivery_charges: number | null;
   total_charges: number | null;
   special_instructions: string | null;
+  order_category: string | null;
+  label_path: string | null;
   notes: string | null;
   customers?: {
     company_name: string;
@@ -89,6 +94,21 @@ export default function OrderDetailsDialog({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const handleLabelAction = async (action: "view" | "download") => {
+    if (!orderDetails?.label_path) return;
+    try {
+      if (action === "view") {
+        window.open(await labelPreviewUrl(orderDetails.label_path), "_blank");
+      } else {
+        await downloadLabel(orderDetails.label_path, orderDetails.order_number);
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to open label"
+      );
+    }
+  };
+
   const handleDelete = async () => {
     if (!orderId) return;
     setDeleting(true);
@@ -98,6 +118,11 @@ export default function OrderDetailsDialog({
         .delete()
         .eq("id", orderId);
       if (error) throw error;
+
+      // Stock is returned by the outbound_order_items delete triggers; the label
+      // file has nothing left pointing at it, so clean it up too
+      if (orderDetails?.label_path) await removeLabel(orderDetails.label_path);
+
       toast.success("Order deleted successfully");
       setDeleteConfirmOpen(false);
       onOpenChange(false);
@@ -199,6 +224,43 @@ export default function OrderDetailsDialog({
                     <span className="capitalize">
                       {orderDetails.order_type}
                     </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">
+                      Category:
+                    </span>
+                    <span className="font-medium">
+                      {orderDetails.order_category || "Uncategorised"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">
+                      Shipping Label:
+                    </span>
+                    {orderDetails.label_path ? (
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={() => handleLabelAction("view")}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={() => handleLabelAction("download")}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Download
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">None</span>
+                    )}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">

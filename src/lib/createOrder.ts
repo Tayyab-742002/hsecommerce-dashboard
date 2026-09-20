@@ -15,6 +15,8 @@ export interface NewOrderInput {
   requested_date: string;
   special_instructions: string | null;
   pick_and_pack_rate: number;
+  order_category?: string | null;
+  label_path?: string | null;
   items: NewOrderItem[];
 }
 
@@ -41,7 +43,8 @@ function generateOrderNumber() {
 }
 
 /**
- * Creates an outbound order with its items and adjusts pallet quantities.
+ * Creates an outbound order with its items. Inventory and pallet quantities are
+ * adjusted by database triggers on outbound_order_items.
  * Throws an Error with a user-readable message on failure.
  * Returns the generated order number.
  */
@@ -59,6 +62,9 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
       order_type: input.order_type,
       requested_date: input.requested_date,
       special_instructions: input.special_instructions || null,
+      order_category: input.order_category?.trim() || null,
+      label_path: input.label_path || null,
+      label_uploaded_at: input.label_path ? new Date().toISOString() : null,
       handling_charges: handlingCharges,
       delivery_charges: 0,
       order_number: orderNumber,
@@ -88,42 +94,6 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
     // Roll back the order header so a failed item insert doesn't leave an empty order
     await supabase.from("outbound_orders").delete().eq("id", order.id);
     throw new Error(itemsError.message || "Failed to add order items");
-  }
-
-  // Decrement pallet_items quantities for pallet-sourced items
-  const palletOrderItems = input.items.filter((item) => item.pallet_id);
-  for (const item of palletOrderItems) {
-    const { data: palletItemRow } = await supabase
-      .from("pallet_items")
-      .select("id, quantity")
-      .eq("pallet_id", item.pallet_id!)
-      .eq("inventory_item_id", item.inventory_item_id)
-      .single();
-
-    if (palletItemRow) {
-      const newQty = Math.max(0, palletItemRow.quantity - (item.quantity ?? 0));
-      await supabase
-        .from("pallet_items")
-        .update({ quantity: newQty })
-        .eq("id", palletItemRow.id);
-
-      // Update pallet status based on remaining quantities across all its items
-      const { data: remainingItems } = await supabase
-        .from("pallet_items")
-        .select("quantity")
-        .eq("pallet_id", item.pallet_id!);
-
-      if (remainingItems) {
-        const totalRemaining = remainingItems.reduce(
-          (sum, r) => sum + (r.quantity ?? 0),
-          0
-        );
-        await supabase
-          .from("pallets")
-          .update({ status: totalRemaining <= 0 ? "empty" : "partially_picked" })
-          .eq("id", item.pallet_id!);
-      }
-    }
   }
 
   return orderNumber;
