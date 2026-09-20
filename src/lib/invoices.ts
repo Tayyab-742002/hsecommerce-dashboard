@@ -12,7 +12,7 @@ export const COMPANY_FIELDS =
   "company_name, address_line1, address_line2, city, postal_code, country, email, phone, company_number, vat_registered, vat_number, vat_rate, bank_name, account_name, sort_code, account_number, payment_terms_days, invoice_footer";
 
 export const CUSTOMER_FIELDS =
-  "company_name, contact_person, customer_code, address_line1, address_line2, city, postal_code, country, tax_id";
+  "company_name, contact_person, customer_code, address_line1, address_line2, city, postal_code, country, tax_id, email, phone";
 
 /** Storage path for an invoice PDF: {customer_id}/{invoice_number}.pdf */
 export const invoicePdfPath = (customerId: string, invoiceNumber: string) =>
