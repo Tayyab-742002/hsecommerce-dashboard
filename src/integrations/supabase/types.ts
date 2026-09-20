@@ -651,6 +651,10 @@ export type Database = {
           order_category: string
         }[]
       }
+      replace_order_label: {
+        Args: { p_order_id: string; p_label_path: string }
+        Returns: string
+      }
       get_user_customer_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

@@ -34,8 +34,92 @@ import {
   Trash2,
   Download,
   ExternalLink,
+  Upload,
 } from "lucide-react";
-import { downloadLabel, labelPreviewUrl, removeLabel } from "@/lib/labels";
+import {
+  LABEL_ACCEPT,
+  downloadLabel,
+  labelPreviewUrl,
+  removeLabel,
+  uploadLabel,
+} from "@/lib/labels";
+import { useRef } from "react";
+import { cn } from "@/lib/utils";
+
+/**
+ * The nine order statuses collapse into five milestones a customer cares about.
+ * 'cancelled' is not on the path — it replaces the timeline entirely.
+ */
+const MILESTONES = [
+  { label: "Requested", statuses: ["pending"] },
+  { label: "Approved", statuses: ["approved"] },
+  { label: "Packed", statuses: ["picking", "packed", "ready"] },
+  { label: "In transit", statuses: ["in_transit"] },
+  { label: "Delivered", statuses: ["delivered", "completed"] },
+];
+
+function OrderTimeline({ status }: { status: string }) {
+  if (status === "cancelled") {
+    return (
+      <div className="rounded-[var(--radius-lg)] border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive">
+        This order was cancelled
+      </div>
+    );
+  }
+
+  const current = MILESTONES.findIndex((step) => step.statuses.includes(status));
+
+  return (
+    <ol className="flex items-start gap-1">
+      {MILESTONES.map((step, index) => {
+        const done = index <= current;
+        return (
+          <li key={step.label} className="flex flex-1 flex-col items-center gap-1.5">
+            <div className="flex w-full items-center">
+              {/* connector on the left of every step but the first */}
+              <span
+                className={cn(
+                  "h-0.5 flex-1",
+                  index === 0
+                    ? "bg-transparent"
+                    : index <= current
+                      ? "bg-primary"
+                      : "bg-border"
+                )}
+              />
+              <span
+                className={cn(
+                  "h-3 w-3 shrink-0 rounded-full border-2",
+                  done
+                    ? "border-primary bg-primary"
+                    : "border-border bg-background"
+                )}
+              />
+              <span
+                className={cn(
+                  "h-0.5 flex-1",
+                  index === MILESTONES.length - 1
+                    ? "bg-transparent"
+                    : index < current
+                      ? "bg-primary"
+                      : "bg-border"
+                )}
+              />
+            </div>
+            <span
+              className={cn(
+                "text-center text-[10px] leading-tight sm:text-xs",
+                done ? "font-medium text-foreground" : "text-muted-foreground"
+              )}
+            >
+              {step.label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -62,6 +146,7 @@ interface OrderDetails {
   special_instructions: string | null;
   order_category: string | null;
   label_path: string | null;
+  customer_id: string;
   notes: string | null;
   customers?: {
     company_name: string;
@@ -93,6 +178,43 @@ export default function OrderDetailsDialog({
   const [loading, setLoading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const labelInputRef = useRef<HTMLInputElement>(null);
+  const [replacingLabel, setReplacingLabel] = useState(false);
+
+  // Customers may only swap a label while the order is still pending; admins
+  // always can. The database function enforces this too.
+  const canReplaceLabel =
+    !!orderDetails &&
+    (showCustomerInfo || orderDetails.status === "pending");
+
+  const handleReplaceLabel = async (file: File) => {
+    if (!orderDetails) return;
+
+    setReplacingLabel(true);
+    let newPath: string | null = null;
+    try {
+      newPath = await uploadLabel(orderDetails.customer_id, file);
+
+      const { data: oldPath, error } = await supabase.rpc(
+        "replace_order_label",
+        { p_order_id: orderDetails.id, p_label_path: newPath }
+      );
+      if (error) throw new Error(error.message);
+
+      if (oldPath) await removeLabel(oldPath);
+      toast.success("Shipping label replaced");
+      fetchOrderDetails();
+    } catch (error) {
+      if (newPath) await removeLabel(newPath);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to replace label"
+      );
+    } finally {
+      setReplacingLabel(false);
+      if (labelInputRef.current) labelInputRef.current.value = "";
+    }
+  };
 
   const handleLabelAction = async (action: "view" | "download") => {
     if (!orderDetails?.label_path) return;
@@ -195,6 +317,8 @@ export default function OrderDetailsDialog({
           </div>
         ) : orderDetails ? (
           <div className="space-y-6">
+            <OrderTimeline status={orderDetails.status} />
+
             {/* Order Header */}
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
@@ -237,30 +361,58 @@ export default function OrderDetailsDialog({
                     <span className="text-sm text-muted-foreground">
                       Shipping Label:
                     </span>
-                    {orderDetails.label_path ? (
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5"
-                          onClick={() => handleLabelAction("view")}
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          View
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5"
-                          onClick={() => handleLabelAction("download")}
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Download
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">None</span>
-                    )}
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {orderDetails.label_path ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5"
+                            onClick={() => handleLabelAction("view")}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5"
+                            onClick={() => handleLabelAction("download")}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Download
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="self-center text-muted-foreground">
+                          None
+                        </span>
+                      )}
+                      {canReplaceLabel && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1.5"
+                            disabled={replacingLabel}
+                            onClick={() => labelInputRef.current?.click()}
+                          >
+                            <Upload className="h-3.5 w-3.5" />
+                            {replacingLabel ? "Uploading..." : "Replace"}
+                          </Button>
+                          <input
+                            ref={labelInputRef}
+                            type="file"
+                            accept={LABEL_ACCEPT}
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) handleReplaceLabel(file);
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">

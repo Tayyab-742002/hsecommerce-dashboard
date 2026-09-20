@@ -20,10 +20,19 @@ import { formatCurrency } from "@/lib/currency";
 import { createOrder } from "@/lib/createOrder";
 import { LABEL_ACCEPT, removeLabel, uploadLabel } from "@/lib/labels";
 
+export interface OrderWizardInitial {
+  warehouse_id: string;
+  order_type: string;
+  order_category: string | null;
+  items: { inventory_item_id: string; quantity: number; unit_price: number }[];
+}
+
 interface OrderWizardProps {
   onComplete: () => void;
   /** When set the wizard runs in customer mode: no customer picker, no pricing fields. */
   customerId?: string;
+  /** Prefills the wizard from a past order (reorder). The label is never reused. */
+  initialOrder?: OrderWizardInitial;
 }
 
 interface OrderItem {
@@ -35,7 +44,11 @@ interface OrderItem {
   pallet_id?: string | null;
 }
 
-export default function OrderWizard({ onComplete, customerId }: OrderWizardProps) {
+export default function OrderWizard({
+  onComplete,
+  customerId,
+  initialOrder,
+}: OrderWizardProps) {
   const { toast } = useToast();
   const customerMode = !!customerId;
   const [step, setStep] = useState("1");
@@ -57,11 +70,11 @@ export default function OrderWizard({ onComplete, customerId }: OrderWizardProps
     delivery_charges: number;
   }>({
     customer_id: customerId ?? "",
-    warehouse_id: "",
-    order_type: "delivery",
+    warehouse_id: initialOrder?.warehouse_id ?? "",
+    order_type: initialOrder?.order_type ?? "delivery",
     requested_date: new Date().toISOString().split("T")[0],
     special_instructions: "",
-    order_category: "",
+    order_category: initialOrder?.order_category ?? "",
     pick_and_pack_rate: 0,
     delivery_charges: 0,
   });
@@ -144,6 +157,41 @@ export default function OrderWizard({ onComplete, customerId }: OrderWizardProps
       .gt("quantity", 0);
     setInventory(data || []);
   };
+
+  // Reorder: the copied lines only carry ids, so they are filled in once the
+  // inventory for this customer and warehouse has loaded. Anything no longer in
+  // stock is dropped rather than silently ordered at zero.
+  const prefilled = useRef(false);
+
+  useEffect(() => {
+    if (!initialOrder || prefilled.current || inventory.length === 0) return;
+
+    const rows = initialOrder.items
+      .map((item) => {
+        const inv = inventory.find((i) => i.id === item.inventory_item_id);
+        if (!inv) return null;
+        return {
+          inventory_item_id: inv.id,
+          quantity: Math.min(item.quantity, inv.quantity),
+          unit_price: item.unit_price,
+          item_name: inv.item_name,
+          available_quantity: inv.quantity,
+          pallet_id: inv.pallet_id ?? null,
+        };
+      })
+      .filter(Boolean) as OrderItem[];
+
+    prefilled.current = true;
+    setOrderItems(rows);
+
+    const dropped = initialOrder.items.length - rows.length;
+    if (dropped > 0) {
+      toast({
+        title: "Some items are unavailable",
+        description: `${dropped} item(s) from the original order are out of stock and were not added`,
+      });
+    }
+  }, [initialOrder, inventory, toast]);
 
   const addOrderItem = () => {
     setOrderItems([
