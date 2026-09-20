@@ -42,3 +42,20 @@ export function likeTerm(term: string) {
   // commas and parens would break out of an or(...) filter list
   return `%${term.trim().replace(/[,()]/g, " ")}%`;
 }
+
+/**
+ * The calendar month before the given date (default: today), as YYYY-MM-DD.
+ * Day 0 of a month is the last day of the month before it, which also handles
+ * short months and the January-to-December year rollover.
+ */
+export function lastMonthRange(today = new Date()) {
+  const iso = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+      date.getDate()
+    ).padStart(2, "0")}`;
+
+  return {
+    from: iso(new Date(today.getFullYear(), today.getMonth() - 1, 1)),
+    to: iso(new Date(today.getFullYear(), today.getMonth(), 0)),
+  };
+}

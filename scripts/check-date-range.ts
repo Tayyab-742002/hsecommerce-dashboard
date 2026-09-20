@@ -1,6 +1,10 @@
 // Runnable check: node --experimental-strip-types scripts/check-date-range.ts
 import assert from "node:assert/strict";
-import { dateFilterRange, likeTerm } from "../src/lib/dateRange.ts";
+import {
+  dateFilterRange,
+  lastMonthRange,
+  likeTerm,
+} from "../src/lib/dateRange.ts";
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -41,4 +45,25 @@ assert.equal(dateFilterRange("all", newYearsDay)!.from, "2026-01-01");
 assert.equal(likeTerm(" a,b(c) "), "%a b c %");
 assert.ok(!likeTerm("a,b").includes(","), "no commas survive");
 
-console.log("ok — date ranges and search terms");
+// Billing periods: the month before, including the awkward boundaries
+assert.deepEqual(lastMonthRange(new Date(2026, 8, 15)), {
+  from: "2026-08-01",
+  to: "2026-08-31",
+});
+assert.deepEqual(
+  lastMonthRange(new Date(2026, 0, 3)),
+  { from: "2025-12-01", to: "2025-12-31" },
+  "January bills December of the previous year"
+);
+assert.deepEqual(
+  lastMonthRange(new Date(2026, 2, 31)),
+  { from: "2026-02-01", to: "2026-02-28" },
+  "short month, and day 31 must not roll into March"
+);
+assert.deepEqual(
+  lastMonthRange(new Date(2028, 2, 5)),
+  { from: "2028-02-01", to: "2028-02-29" },
+  "leap year"
+);
+
+console.log("ok — date ranges, billing periods and search terms");

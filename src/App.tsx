@@ -12,6 +12,7 @@ import AdminInventory from "./pages/admin/Inventory";
 import AdminOrders from "./pages/admin/Orders";
 import AdminCustomerOrders from "./pages/admin/AdminCustomerOrders";
 import AdminCustomers from "./pages/admin/Customers";
+import AdminInvoices from "./pages/admin/Invoices";
 import AdminReports from "./pages/admin/Reports";
 import AdminSettings from "./pages/admin/Settings";
 import AdminPallets from "./pages/admin/Pallets";
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="orders" element={<AdminOrders />} />
             <Route path="orders/:customerId" element={<AdminCustomerOrders />} />
             <Route path="customers" element={<AdminCustomers />} />
+            <Route path="invoices" element={<AdminInvoices />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>

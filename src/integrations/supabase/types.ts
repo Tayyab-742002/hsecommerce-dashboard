@@ -14,6 +14,201 @@ export type Database = {
   }
   public: {
     Tables: {
+      company_settings: {
+        Row: {
+          id: number
+          company_name: string
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          postal_code: string | null
+          country: string | null
+          email: string | null
+          phone: string | null
+          company_number: string | null
+          vat_registered: boolean
+          vat_number: string | null
+          vat_rate: number
+          bank_name: string | null
+          account_name: string | null
+          sort_code: string | null
+          account_number: string | null
+          payment_terms_days: number
+          invoice_footer: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          company_name?: string
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          postal_code?: string | null
+          country?: string | null
+          email?: string | null
+          phone?: string | null
+          company_number?: string | null
+          vat_registered?: boolean
+          vat_number?: string | null
+          vat_rate?: number
+          bank_name?: string | null
+          account_name?: string | null
+          sort_code?: string | null
+          account_number?: string | null
+          payment_terms_days?: number
+          invoice_footer?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          company_name?: string
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          postal_code?: string | null
+          country?: string | null
+          email?: string | null
+          phone?: string | null
+          company_number?: string | null
+          vat_registered?: boolean
+          vat_number?: string | null
+          vat_rate?: number
+          bank_name?: string | null
+          account_name?: string | null
+          sort_code?: string | null
+          account_number?: string | null
+          payment_terms_days?: number
+          invoice_footer?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          id: string
+          invoice_number: string | null
+          customer_id: string
+          status: string
+          period_start: string
+          period_end: string
+          issue_date: string | null
+          due_date: string | null
+          subtotal: number
+          vat_rate: number
+          vat_amount: number
+          total: number
+          amount_paid: number
+          paid_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          notes: string | null
+          pdf_path: string | null
+          sent_at: string | null
+          viewed_at: string | null
+          voided_at: string | null
+          void_reason: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          invoice_number?: string | null
+          customer_id?: string
+          status?: string
+          period_start?: string
+          period_end?: string
+          issue_date?: string | null
+          due_date?: string | null
+          subtotal?: number
+          vat_rate?: number
+          vat_amount?: number
+          total?: number
+          amount_paid?: number
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          notes?: string | null
+          pdf_path?: string | null
+          sent_at?: string | null
+          viewed_at?: string | null
+          voided_at?: string | null
+          void_reason?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          invoice_number?: string | null
+          customer_id?: string
+          status?: string
+          period_start?: string
+          period_end?: string
+          issue_date?: string | null
+          due_date?: string | null
+          subtotal?: number
+          vat_rate?: number
+          vat_amount?: number
+          total?: number
+          amount_paid?: number
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          notes?: string | null
+          pdf_path?: string | null
+          sent_at?: string | null
+          viewed_at?: string | null
+          voided_at?: string | null
+          void_reason?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      invoice_lines: {
+        Row: {
+          id: string
+          invoice_id: string
+          line_no: number
+          description: string
+          quantity: number
+          unit_price: number
+          amount: number
+          source_type: string
+          source_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          invoice_id?: string
+          line_no?: number
+          description?: string
+          quantity?: number
+          unit_price?: number
+          amount?: number
+          source_type?: string
+          source_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          invoice_id?: string
+          line_no?: number
+          description?: string
+          quantity?: number
+          unit_price?: number
+          amount?: number
+          source_type?: string
+          source_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address_line1: string | null
@@ -651,6 +846,20 @@ export type Database = {
           order_category: string
         }[]
       }
+      invoice_candidates: {
+        Args: { p_customer_id: string; p_from: string; p_to: string }
+        Returns: {
+          source_type: string
+          source_id: string
+          occurred_on: string
+          description: string
+          quantity: number
+          unit_price: number
+          amount: number
+        }[]
+      }
+      next_invoice_number: { Args: Record<string, never>; Returns: string }
+      mark_invoice_viewed: { Args: { p_invoice_id: string }; Returns: undefined }
       replace_order_label: {
         Args: { p_order_id: string; p_label_path: string }
         Returns: string
