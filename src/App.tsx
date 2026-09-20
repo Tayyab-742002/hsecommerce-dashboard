@@ -10,6 +10,7 @@ import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminInventory from "./pages/admin/Inventory";
 import AdminOrders from "./pages/admin/Orders";
+import AdminCustomerOrders from "./pages/admin/AdminCustomerOrders";
 import AdminCustomers from "./pages/admin/Customers";
 import AdminReports from "./pages/admin/Reports";
 import AdminSettings from "./pages/admin/Settings";
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="pallets" element={<AdminPallets />} />
             {/* <Route path="receive-inventory" element={<ReceiveInventory />} /> */}
             <Route path="orders" element={<AdminOrders />} />
+            <Route path="orders/:customerId" element={<AdminCustomerOrders />} />
             <Route path="customers" element={<AdminCustomers />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="settings" element={<AdminSettings />} />
