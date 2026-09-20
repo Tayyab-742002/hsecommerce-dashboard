@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency } from "./currency.ts";
 
 export interface InvoiceCompany {
   company_name: string;
@@ -29,6 +29,8 @@ export interface InvoiceCustomer {
   postal_code: string | null;
   country: string | null;
   tax_id: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 export interface InvoiceDocument {
@@ -52,6 +54,21 @@ export interface InvoiceDocument {
   }[];
 }
 
+/**
+ * Brand palette. The logo pairs golden yellow with near-black, so the yellow is
+ * always a background for dark text — never the other way round, which at this
+ * lightness fails legibility.
+ */
+const BRAND = [235, 179, 10] as const;
+const INK = [22, 22, 24] as const;
+const MUTED = [118, 118, 124] as const;
+const CREAM = [253, 247, 230] as const; // brand at ~8% over white
+const DEEP = [138, 102, 4] as const; // readable heading on cream
+const RULE = [232, 228, 216] as const;
+const ZEBRA = [252, 250, 243] as const;
+
+const MARGIN = 40;
+
 const gbDate = (value: string) =>
   new Date(value).toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -59,9 +76,27 @@ const gbDate = (value: string) =>
     year: "numeric",
   });
 
-/** Drops blank lines so an address never renders with gaps. */
-const addressLines = (parts: (string | null | undefined)[]) =>
-  parts.filter((part) => part && part.trim()).map((part) => part as string);
+/** Drops blanks so an address never renders with gaps. */
+const lines = (parts: (string | null | undefined)[]) =>
+  parts.filter((part) => part && String(part).trim()).map(String);
+
+/** The app logo as a data URL. Returns null if it can't be loaded — the
+ *  invoice must still render without it. */
+async function loadLogo(): Promise<string | null> {
+  try {
+    const response = await fetch("/logo.png");
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Renders the invoice and returns it as a PDF blob.
@@ -76,137 +111,230 @@ export async function buildInvoicePdf(
 ): Promise<Blob> {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
+  const logo = await loadLogo();
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 40;
-  const right = pageWidth - margin;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const right = pageWidth - MARGIN;
+  const contentWidth = pageWidth - MARGIN * 2;
 
-  const ink = [17, 24, 39] as const;
-  const muted = [107, 114, 128] as const;
+  const fill = (color: readonly number[]) =>
+    doc.setFillColor(color[0], color[1], color[2]);
+  const ink = (color: readonly number[]) =>
+    doc.setTextColor(color[0], color[1], color[2]);
+  const font = (style: "normal" | "bold", size: number) => {
+    doc.setFont("helvetica", style);
+    doc.setFontSize(size);
+  };
 
-  // ── letterhead ────────────────────────────────────────────────────────
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(...ink);
-  doc.text(company.company_name, margin, 56);
+  // ─────────────────────────────────────────────────────────────────────
+  // Header band: logo and company on the left, invoice meta on the right
+  // ─────────────────────────────────────────────────────────────────────
+  fill(CREAM);
+  doc.rect(0, 0, pageWidth, 118, "F");
+  fill(BRAND);
+  doc.rect(0, 118, pageWidth, 4, "F");
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...muted);
-  let y = 72;
-  for (const line of addressLines([
+  let textLeft = MARGIN;
+  if (logo) {
+    try {
+      doc.addImage(logo, "PNG", MARGIN, 26, 54, 54);
+      textLeft = MARGIN + 66;
+    } catch {
+      // A logo that won't decode shouldn't cost us the invoice
+    }
+  }
+
+  font("bold", 17);
+  ink(INK);
+  doc.text(company.company_name, textLeft, 50);
+
+  font("normal", 9);
+  ink(MUTED);
+  const strap = lines([
+    [company.city, company.postal_code].filter(Boolean).join(" "),
+    company.email,
+    company.phone,
+  ]).join("   ·   ");
+  if (strap) doc.text(strap, textLeft, 66);
+
+  font("bold", 26);
+  ink(INK);
+  doc.text("INVOICE", right, 48, { align: "right" });
+
+  font("bold", 11);
+  ink(DEEP);
+  doc.text(invoice.invoice_number, right, 66, { align: "right" });
+
+  // label / value rows, labels muted and values bold
+  const meta: [string, string][] = [
+    ["Invoice Date", gbDate(invoice.issue_date)],
+    ["Due Date", gbDate(invoice.due_date)],
+  ];
+  let metaY = 84;
+  for (const [label, value] of meta) {
+    font("normal", 9);
+    ink(MUTED);
+    doc.text(label, right - 96, metaY, { align: "right" });
+    font("bold", 9);
+    ink(INK);
+    doc.text(value, right, metaY, { align: "right" });
+    metaY += 14;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Billed By / Billed To
+  // ─────────────────────────────────────────────────────────────────────
+  const cardGap = 14;
+  const cardWidth = (contentWidth - cardGap) / 2;
+  const cardTop = 142;
+  const pad = 14;
+
+  const billedBy = lines([
+    company.company_name,
     company.address_line1,
     company.address_line2,
     [company.city, company.postal_code].filter(Boolean).join(" "),
     company.country,
-    company.email,
-    company.phone,
     company.company_number ? `Company no. ${company.company_number}` : null,
     company.vat_registered && company.vat_number
       ? `VAT ${company.vat_number}`
       : null,
-  ])) {
-    doc.text(line, margin, y);
-    y += 12;
-  }
+    company.email ? `Email: ${company.email}` : null,
+    company.phone ? `Phone: ${company.phone}` : null,
+  ]);
 
-  // ── invoice meta, right aligned ───────────────────────────────────────
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(...ink);
-  doc.text("INVOICE", right, 56, { align: "right" });
-
-  doc.setFontSize(10);
-  doc.text(invoice.invoice_number, right, 74, { align: "right" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...muted);
-  doc.text(`Issued  ${gbDate(invoice.issue_date)}`, right, 90, {
-    align: "right",
-  });
-  doc.text(`Due     ${gbDate(invoice.due_date)}`, right, 102, {
-    align: "right",
-  });
-
-  if (invoice.status === "void") {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(30);
-    doc.setTextColor(220, 38, 38);
-    doc.text("VOID", pageWidth / 2, 300, { align: "center", angle: 20 });
-  }
-
-  // ── bill to / period ──────────────────────────────────────────────────
-  const blockTop = Math.max(y, 118) + 14;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...muted);
-  doc.text("BILL TO", margin, blockTop);
-  doc.text("PERIOD", right, blockTop, { align: "right" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...ink);
-  let billY = blockTop + 14;
-  for (const line of addressLines([
+  const billedTo = lines([
     customer.company_name || customer.contact_person,
     customer.address_line1,
     customer.address_line2,
     [customer.city, customer.postal_code].filter(Boolean).join(" "),
     customer.country,
     customer.tax_id ? `VAT ${customer.tax_id}` : null,
-  ])) {
-    doc.text(line, margin, billY);
-    billY += 12;
-  }
+    customer.email ? `Email: ${customer.email}` : null,
+    customer.phone ? `Phone: ${customer.phone}` : null,
+    `Account: ${customer.customer_code}`,
+  ]);
 
-  let metaY = blockTop + 14;
+  // Wrap first so both cards can share the taller card's height
+  const wrap = (source: string[]) =>
+    source.flatMap((line) =>
+      doc.splitTextToSize(line, cardWidth - pad * 2) as string[]
+    );
+  const leftLines = wrap(billedBy);
+  const rightLines = wrap(billedTo);
+  const cardHeight =
+    pad + 16 + Math.max(leftLines.length, rightLines.length) * 13 + pad - 4;
+
+  const drawCard = (x: number, title: string, body: string[]) => {
+    fill(CREAM);
+    doc.roundedRect(x, cardTop, cardWidth, cardHeight, 7, 7, "F");
+
+    font("bold", 11);
+    ink(DEEP);
+    doc.text(title, x + pad, cardTop + pad + 6);
+
+    let lineY = cardTop + pad + 24;
+    body.forEach((line, index) => {
+      font(index === 0 ? "bold" : "normal", 9);
+      ink(index === 0 ? INK : MUTED);
+      doc.text(line, x + pad, lineY);
+      lineY += 13;
+    });
+  };
+
+  drawCard(MARGIN, "Billed By", leftLines);
+  drawCard(MARGIN + cardWidth + cardGap, "Billed To", rightLines);
+
+  // Billing period sits between the cards and the table
+  const periodY = cardTop + cardHeight + 20;
+  font("normal", 9);
+  ink(MUTED);
+  doc.text("Billing period", MARGIN, periodY);
+  font("bold", 9);
+  ink(INK);
   doc.text(
-    `${gbDate(invoice.period_start)} – ${gbDate(invoice.period_end)}`,
-    right,
-    metaY,
-    { align: "right" }
+    `${gbDate(invoice.period_start)} — ${gbDate(invoice.period_end)}`,
+    MARGIN + 66,
+    periodY
   );
-  metaY += 12;
-  doc.text(`Account ${customer.customer_code}`, right, metaY, {
-    align: "right",
-  });
 
-  // ── lines ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
+  // Items
+  // ─────────────────────────────────────────────────────────────────────
   autoTable(doc, {
-    startY: Math.max(billY, metaY) + 18,
-    margin: { left: margin, right: margin },
-    head: [["Description", "Qty", "Unit", "Amount"]],
-    body: invoice.lines.map((line) => [
+    startY: periodY + 12,
+    margin: { left: MARGIN, right: MARGIN, top: 56 },
+    head: [["#", "Item", "Quantity", "Rate", "Amount"]],
+    body: invoice.lines.map((line, index) => [
+      String(index + 1),
       line.description,
       String(line.quantity),
       formatCurrency(line.unit_price),
       formatCurrency(line.amount),
     ]),
-    styles: { font: "helvetica", fontSize: 9, cellPadding: 6 },
+    theme: "plain",
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      cellPadding: { top: 9, bottom: 9, left: 8, right: 8 },
+      textColor: [INK[0], INK[1], INK[2]],
+      lineColor: [RULE[0], RULE[1], RULE[2]],
+      lineWidth: 0.5,
+    },
     headStyles: {
-      fillColor: [243, 244, 246],
-      textColor: [17, 24, 39],
+      fillColor: [BRAND[0], BRAND[1], BRAND[2]],
+      textColor: [INK[0], INK[1], INK[2]],
       fontStyle: "bold",
+      fontSize: 9,
+      cellPadding: { top: 10, bottom: 10, left: 8, right: 8 },
+      lineWidth: 0,
+    },
+    alternateRowStyles: {
+      fillColor: [ZEBRA[0], ZEBRA[1], ZEBRA[2]],
     },
     columnStyles: {
-      0: { cellWidth: "auto" },
-      1: { cellWidth: 44, halign: "right" },
-      2: { cellWidth: 70, halign: "right" },
-      3: { cellWidth: 80, halign: "right" },
+      0: { cellWidth: 26, halign: "center", textColor: [MUTED[0], MUTED[1], MUTED[2]] },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 66, halign: "right" },
+      3: { cellWidth: 70, halign: "right" },
+      4: { cellWidth: 78, halign: "right", fontStyle: "bold" },
+    },
+    // Continuation pages get a slim branded strip instead of the full header
+    didDrawPage: (data) => {
+      if (data.pageNumber === 1) return;
+      fill(CREAM);
+      doc.rect(0, 0, pageWidth, 40, "F");
+      fill(BRAND);
+      doc.rect(0, 40, pageWidth, 3, "F");
+      font("bold", 10);
+      ink(INK);
+      doc.text(company.company_name, MARGIN, 26);
+      font("normal", 9);
+      ink(MUTED);
+      doc.text(invoice.invoice_number, right, 26, { align: "right" });
     },
   });
 
-  // ── totals ────────────────────────────────────────────────────────────
-  const afterTable =
+  // ─────────────────────────────────────────────────────────────────────
+  // Bank details (left) and totals (right)
+  // ─────────────────────────────────────────────────────────────────────
+  let y =
     (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY + 18;
+      .finalY + 24;
+
+  const bank: [string, string][] = [];
+  if (company.account_name) bank.push(["Account Name", company.account_name]);
+  if (company.account_number)
+    bank.push(["Account Number", company.account_number]);
+  if (company.sort_code) bank.push(["Sort Code", company.sort_code]);
+  if (company.bank_name) bank.push(["Bank", company.bank_name]);
+  bank.push(["Reference", invoice.invoice_number]);
 
   const totals: [string, string, boolean][] = [
     ["Subtotal", formatCurrency(invoice.subtotal), false],
   ];
-  // VAT only appears when the business is actually registered
   if (invoice.vat_rate > 0) {
     totals.push([
       `VAT @ ${invoice.vat_rate}%`,
@@ -214,63 +342,117 @@ export async function buildInvoicePdf(
       false,
     ]);
   }
-  totals.push(["Total", formatCurrency(invoice.total), true]);
   if (invoice.amount_paid > 0) {
     totals.push(["Paid", `-${formatCurrency(invoice.amount_paid)}`, false]);
-    totals.push([
-      "Balance due",
-      formatCurrency(invoice.total - invoice.amount_paid),
-      true,
-    ]);
   }
 
-  let totalsY = afterTable;
-  for (const [label, value, strong] of totals) {
-    doc.setFont("helvetica", strong ? "bold" : "normal");
-    doc.setFontSize(strong ? 11 : 9);
-    const tone = strong ? ink : muted;
-    doc.setTextColor(tone[0], tone[1], tone[2]);
-    doc.text(label, right - 90, totalsY, { align: "right" });
-    doc.setTextColor(...ink);
-    doc.text(value, right, totalsY, { align: "right" });
-    totalsY += strong ? 18 : 14;
+  const bankHeight = pad + 18 + bank.length * 16 + pad - 6;
+  const totalsHeight = totals.length * 16 + 44;
+  const blockHeight = Math.max(bankHeight, totalsHeight);
+
+  // Keep the closing block whole rather than splitting it across a page break
+  if (y + blockHeight > pageHeight - 90) {
+    doc.addPage();
+    y = 70;
   }
 
-  // ── payment details and notes ─────────────────────────────────────────
-  let footerY = totalsY + 16;
-  const payment = addressLines([
-    company.bank_name,
-    company.account_name ? `Account name: ${company.account_name}` : null,
-    company.sort_code ? `Sort code: ${company.sort_code}` : null,
-    company.account_number ? `Account number: ${company.account_number}` : null,
-    `Payment reference: ${invoice.invoice_number}`,
-  ]);
+  const bankWidth = cardWidth;
+  fill(CREAM);
+  doc.roundedRect(MARGIN, y, bankWidth, bankHeight, 7, 7, "F");
 
-  if (payment.length > 0) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...muted);
-    doc.text("PAYMENT DETAILS", margin, footerY);
-    footerY += 14;
+  font("bold", 11);
+  ink(DEEP);
+  doc.text("Bank Details", MARGIN + pad, y + pad + 6);
 
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...ink);
-    for (const line of payment) {
-      doc.text(line, margin, footerY);
-      footerY += 12;
-    }
+  let bankY = y + pad + 26;
+  for (const [label, value] of bank) {
+    font("bold", 9);
+    ink(INK);
+    doc.text(label, MARGIN + pad, bankY);
+    font("normal", 9);
+    ink(MUTED);
+    doc.text(value, MARGIN + pad + 108, bankY);
+    bankY += 16;
   }
+
+  const totalsLeft = MARGIN + cardWidth + cardGap;
+  const totalsWidth = cardWidth;
+  let totalsY = y + 10;
+
+  for (const [label, value] of totals) {
+    font("normal", 10);
+    ink(MUTED);
+    doc.text(label, totalsLeft + 12, totalsY);
+    font("normal", 10);
+    ink(INK);
+    doc.text(value, totalsLeft + totalsWidth - 12, totalsY, { align: "right" });
+    totalsY += 16;
+  }
+
+  // The amount owed is the one number a reader looks for
+  const dueLabel = invoice.amount_paid > 0 ? "Balance Due (GBP)" : "Total (GBP)";
+  const dueValue = formatCurrency(invoice.total - invoice.amount_paid);
+
+  fill(BRAND);
+  doc.roundedRect(totalsLeft, totalsY - 2, totalsWidth, 34, 7, 7, "F");
+  font("bold", 12);
+  ink(INK);
+  doc.text(dueLabel, totalsLeft + 12, totalsY + 20);
+  font("bold", 14);
+  doc.text(dueValue, totalsLeft + totalsWidth - 12, totalsY + 20, {
+    align: "right",
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Notes and footer
+  // ─────────────────────────────────────────────────────────────────────
+  let footerY = Math.max(bankY, totalsY + 46) + 12;
 
   for (const block of [invoice.notes, company.invoice_footer]) {
     if (!block) continue;
-    footerY += 6;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...muted);
-    for (const line of doc.splitTextToSize(block, right - margin)) {
-      doc.text(line, margin, footerY);
+    font("normal", 8);
+    ink(MUTED);
+    for (const line of doc.splitTextToSize(block, contentWidth) as string[]) {
+      if (footerY > pageHeight - 60) break;
+      doc.text(line, MARGIN, footerY);
       footerY += 11;
     }
+    footerY += 4;
+  }
+
+  // Void stamp and page numbers, on every page
+  const pageCount = doc.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+
+    if (invoice.status === "void") {
+      doc.saveGraphicsState();
+      // @ts-expect-error — GState is present at runtime, not in the older types
+      doc.setGState(new doc.GState({ opacity: 0.18 }));
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(90);
+      doc.setTextColor(200, 30, 30);
+      doc.text("VOID", pageWidth / 2, pageHeight / 2, {
+        align: "center",
+        angle: 24,
+      });
+      doc.restoreGraphicsState();
+    }
+
+    doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
+    doc.setLineWidth(0.5);
+    doc.line(MARGIN, pageHeight - 46, right, pageHeight - 46);
+
+    font("normal", 8);
+    ink(MUTED);
+    doc.text(
+      `${company.company_name} · ${invoice.invoice_number}`,
+      MARGIN,
+      pageHeight - 32
+    );
+    doc.text(`Page ${page} of ${pageCount}`, right, pageHeight - 32, {
+      align: "right",
+    });
   }
 
   return doc.output("blob");
