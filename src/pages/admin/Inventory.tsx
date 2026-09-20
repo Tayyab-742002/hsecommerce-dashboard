@@ -26,6 +26,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import TablePagination from "@/components/TablePagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface InventoryItem {
   id: string;
@@ -214,6 +216,8 @@ export default function AdminInventory() {
       setItemToDelete(null);
     }
   };
+  const { pageItems: pagedItems, ...pagination } = usePagination(filteredItems);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -333,7 +337,7 @@ export default function AdminInventory() {
           
           {/* Results Count */}
           <div className="text-sm text-muted-foreground">
-            Showing {filteredItems.length} of {items.length} items
+            {filteredItems.length} of {items.length} items match the filters
           </div>
         </CardHeader>
         <CardContent>
@@ -349,7 +353,7 @@ export default function AdminInventory() {
                   No items found
                 </div>
               ) : (
-                filteredItems.map((item) => (
+                pagedItems.map((item) => (
                   <div
                     key={item.id}
                     className="rounded-lg border border-border bg-card p-3 shadow-sm"
@@ -494,7 +498,7 @@ export default function AdminInventory() {
                         </td>
                       </tr>
                     ) : (
-                      filteredItems.map((item) => (
+                      pagedItems.map((item) => (
                         <tr
                           key={item.id}
                           className="border-b border-border/60 last:border-b-0"
@@ -558,6 +562,11 @@ export default function AdminInventory() {
                 </table>
               </div>
             </div>
+          <TablePagination
+            {...pagination}
+            label="items"
+            onPageChange={pagination.setPage}
+          />
           </>
         </CardContent>
       </Card>

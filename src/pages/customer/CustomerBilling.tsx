@@ -5,6 +5,8 @@ import { KPICard } from "@/components/KPICard";
 import Spinner from "@/components/Spinner";
 import { formatCurrency } from "@/lib/currency";
 import { PoundSterling, TrendingUp, Package } from "lucide-react";
+import TablePagination from "@/components/TablePagination";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function CustomerBilling() {
   const [stats, setStats] = useState({
@@ -71,6 +73,8 @@ export default function CustomerBilling() {
     setLoading(false);
   };
 
+  const { pageItems: pagedCharges, ...pagination } = usePagination(recentCharges);
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       <div>
@@ -114,7 +118,7 @@ export default function CustomerBilling() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
-                {recentCharges.map((charge) => (
+                {pagedCharges.map((charge) => (
                   <div
                     key={charge.id}
                     className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
@@ -161,7 +165,7 @@ export default function CustomerBilling() {
                       </tr>
                     </thead>
                     <tbody>
-                      {recentCharges.map((charge) => (
+                      {pagedCharges.map((charge) => (
                         <tr key={charge.id}>
                           <td className="font-medium whitespace-nowrap">
                             {charge.order_number}
@@ -182,6 +186,11 @@ export default function CustomerBilling() {
                   </table>
                 </div>
               </div>
+            <TablePagination
+              {...pagination}
+              label="charges"
+              onPageChange={pagination.setPage}
+            />
             </>
           )}
         </CardContent>

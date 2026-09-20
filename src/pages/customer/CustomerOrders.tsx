@@ -25,6 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import TablePagination from "@/components/TablePagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Order {
   id: string;
@@ -197,6 +199,8 @@ export default function CustomerOrders() {
     setDetailsDialogOpen(true);
   };
 
+  const { pageItems: pagedOrders, ...pagination } = usePagination(filteredOrders);
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -338,7 +342,7 @@ export default function CustomerOrders() {
             )}
 
             <div className="text-sm text-muted-foreground">
-              Showing {filteredOrders.length} of {orders.length} orders
+              {filteredOrders.length} of {orders.length} orders match the filters
             </div>
           </div>
         </CardHeader>
@@ -355,7 +359,7 @@ export default function CustomerOrders() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
-                {filteredOrders.map((order) => (
+                {pagedOrders.map((order) => (
                   <div
                     key={order.id}
                     className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
@@ -453,7 +457,7 @@ export default function CustomerOrders() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredOrders.map((order) => (
+                      {pagedOrders.map((order) => (
                         <tr
                           key={order.id}
                           className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -537,6 +541,11 @@ export default function CustomerOrders() {
                   </table>
                 </div>
               </div>
+            <TablePagination
+              {...pagination}
+              label="orders"
+              onPageChange={pagination.setPage}
+            />
             </>
           )}
         </CardContent>

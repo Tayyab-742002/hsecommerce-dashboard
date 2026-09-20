@@ -20,6 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import TablePagination from "@/components/TablePagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Customer {
   id: string;
@@ -134,6 +136,8 @@ export default function AdminCustomers() {
     navigate(`/admin/inventory?customer=${customerId}`);
   };
 
+  const { pageItems: pagedCustomers, ...pagination } = usePagination(filteredCustomers);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -180,7 +184,7 @@ export default function AdminCustomers() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
-                {filteredCustomers.map((customer) => (
+                {pagedCustomers.map((customer) => (
                   <div
                     key={customer.id}
                     className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
@@ -311,7 +315,7 @@ export default function AdminCustomers() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredCustomers.map((customer) => (
+                      {pagedCustomers.map((customer) => (
                         <tr
                           key={customer.id}
                           className="cursor-pointer"
@@ -404,6 +408,11 @@ export default function AdminCustomers() {
                   </table>
                 </div>
               </div>
+            <TablePagination
+              {...pagination}
+              label="customers"
+              onPageChange={pagination.setPage}
+            />
             </>
           )}
         </CardContent>

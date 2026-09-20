@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import TablePagination from "@/components/TablePagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface InventoryItem {
   id: string;
@@ -145,6 +147,8 @@ export default function CustomerInventory() {
 
   const hasActiveFilters = dateFilter !== "all" || statusFilter !== "all" || categoryFilter !== "all";
 
+  const { pageItems: pagedItems, ...pagination } = usePagination(filteredItems);
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       <div>
@@ -244,7 +248,7 @@ export default function CustomerInventory() {
             )}
 
             <div className="text-sm text-muted-foreground">
-              Showing {filteredItems.length} of {items.length} items
+              {filteredItems.length} of {items.length} items match the filters
             </div>
           </div>
         </CardHeader>
@@ -261,7 +265,7 @@ export default function CustomerInventory() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
-                {filteredItems.map((item) => (
+                {pagedItems.map((item) => (
                   <div
                     key={item.id}
                     className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
@@ -341,7 +345,7 @@ export default function CustomerInventory() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredItems.map((item) => (
+                      {pagedItems.map((item) => (
                         <tr key={item.id}>
                           <td className="font-medium whitespace-nowrap">
                             {item.item_code}
@@ -393,6 +397,11 @@ export default function CustomerInventory() {
                   </table>
                 </div>
               </div>
+            <TablePagination
+              {...pagination}
+              label="items"
+              onPageChange={pagination.setPage}
+            />
             </>
           )}
         </CardContent>
