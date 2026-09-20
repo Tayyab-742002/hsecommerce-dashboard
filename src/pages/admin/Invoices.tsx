@@ -26,7 +26,7 @@ import { usePagedQuery } from "@/hooks/usePagedQuery";
 import { formatCurrency } from "@/lib/currency";
 import { lastMonthRange } from "@/lib/dateRange";
 import { toast } from "sonner";
-import { FileText, Plus, Receipt } from "lucide-react";
+import { AlertTriangle, FileText, Plus, Receipt } from "lucide-react";
 
 interface InvoiceRow {
   id: string;
@@ -52,6 +52,13 @@ interface Candidate {
 
 const gbDate = (value: string | null) =>
   value ? new Date(value).toLocaleDateString("en-GB") : "—";
+
+/**
+ * A candidate with no charges is work nobody priced. Invoicing it at £0 spends
+ * it — the once-only guard means it can never be billed again — so these are
+ * flagged and left unticked.
+ */
+const isUnpriced = (row: Candidate) => Number(row.amount) === 0;
 
 function statusTone(invoice: InvoiceRow) {
   if (invoice.status === "void") return "bg-muted text-muted-foreground";
@@ -148,7 +155,9 @@ export default function AdminInvoices() {
     }
 
     setCandidates(data ?? []);
-    setChosen((data ?? []).map((row) => row.source_id));
+    setChosen(
+      (data ?? []).filter((row) => !isUnpriced(row)).map((row) => row.source_id)
+    );
   };
 
   const createDraft = async () => {
@@ -225,6 +234,8 @@ export default function AdminInvoices() {
     setChosen([]);
     setDraft({ customerId: "", ...lastMonthRange() });
   };
+
+  const unpricedCount = (candidates ?? []).filter(isUnpriced).length;
 
   const chosenTotal = (candidates ?? [])
     .filter((row) => chosen.includes(row.source_id))
@@ -420,7 +431,11 @@ export default function AdminInvoices() {
                     {candidates.map((row) => (
                       <label
                         key={row.source_id}
-                        className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm hover:bg-muted/50"
+                        className={`flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm ${
+                          isUnpriced(row)
+                            ? "bg-amber-500/10 hover:bg-amber-500/20"
+                            : "hover:bg-muted/50"
+                        }`}
                       >
                         <Checkbox
                           checked={chosen.includes(row.source_id)}
@@ -435,11 +450,36 @@ export default function AdminInvoices() {
                         <span className="min-w-0 flex-1 truncate">
                           {row.description}
                         </span>
-                        <span className="font-medium">
+                        {isUnpriced(row) && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-amber-500/60 text-amber-600"
+                          >
+                            Unpriced
+                          </Badge>
+                        )}
+                        <span
+                          className={`font-medium ${
+                            isUnpriced(row) ? "text-amber-600" : ""
+                          }`}
+                        >
                           {formatCurrency(Number(row.amount))}
                         </span>
                       </label>
                     ))}
+                  </div>
+                )}
+
+                {unpricedCount > 0 && (
+                  <div className="flex items-start gap-2 rounded-[var(--radius-lg)] border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <p>
+                      {unpricedCount}{" "}
+                      {unpricedCount === 1 ? "item has" : "items have"} no
+                      charges yet, so {unpricedCount === 1 ? "it is" : "they are"}{" "}
+                      left unticked. Price the order first, or invoice at £0 —
+                      once invoiced it can't be billed again.
+                    </p>
                   </div>
                 )}
 
