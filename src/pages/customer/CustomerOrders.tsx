@@ -6,8 +6,18 @@ import { StatusBadge } from "@/components/StatusBadge";
 import OrderDetailsDialog from "@/components/OrderDetailsDialog";
 import Spinner from "@/components/Spinner";
 import { formatCurrency } from "@/lib/currency";
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter, X, Plus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import OrderWizard from "@/components/OrderWizard";
+import { downloadLabel } from "@/lib/labels";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -23,6 +33,8 @@ interface Order {
   order_type: string;
   priority?: string;
   requested_date: string;
+  order_category?: string | null;
+  label_path?: string | null;
   scheduled_date?: string | null;
   completed_date?: string | null;
   total_items: number;
@@ -49,7 +61,10 @@ export default function CustomerOrders() {
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -72,6 +87,8 @@ export default function CustomerOrders() {
       setLoading(false);
       return;
     }
+
+    setCustomerId(userRole.customer_id);
 
     const { data, error } = await supabase
       .from("outbound_orders")
@@ -135,17 +152,45 @@ export default function CustomerOrders() {
     
     // Order type filter
     const matchesOrderType = orderTypeFilter === "all" || order.order_type === orderTypeFilter;
-    
-    return matchesSearch && matchesDate && matchesStatus && matchesOrderType;
+
+    // Category filter ("none" = orders not filed in any folder)
+    const matchesCategory =
+      categoryFilter === "all" ||
+      (categoryFilter === "none"
+        ? !order.order_category
+        : order.order_category === categoryFilter);
+
+    return matchesSearch && matchesDate && matchesStatus && matchesOrderType && matchesCategory;
   });
 
   const clearFilters = () => {
     setDateFilter("all");
     setStatusFilter("all");
     setOrderTypeFilter("all");
+    setCategoryFilter("all");
   };
 
-  const hasActiveFilters = dateFilter !== "all" || statusFilter !== "all" || orderTypeFilter !== "all";
+  const hasActiveFilters =
+    dateFilter !== "all" ||
+    statusFilter !== "all" ||
+    orderTypeFilter !== "all" ||
+    categoryFilter !== "all";
+
+  const categories = [
+    ...new Set(orders.map((o) => o.order_category).filter(Boolean) as string[]),
+  ].sort();
+
+  const handleLabelDownload = async (order: Order, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!order.label_path) return;
+    try {
+      await downloadLabel(order.label_path, order.order_number);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to download label"
+      );
+    }
+  };
 
   const handleOrderClick = (orderId: string) => {
     setSelectedOrderId(orderId);
@@ -154,9 +199,35 @@ export default function CustomerOrders() {
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">My Orders</h1>
-        <p className="text-muted-foreground">Track your outbound orders</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">My Orders</h1>
+          <p className="text-muted-foreground">
+            Create and track your outbound orders
+          </p>
+        </div>
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="w-full sm:w-auto" disabled={!customerId}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Order
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create New Order</DialogTitle>
+            </DialogHeader>
+            {customerId && (
+              <OrderWizard
+                customerId={customerId}
+                onComplete={() => {
+                  setCreateDialogOpen(false);
+                  fetchOrders();
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
@@ -173,7 +244,7 @@ export default function CustomerOrders() {
               Filters
               {hasActiveFilters && (
                 <span className="ml-2 bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
-                  {[dateFilter !== "all", statusFilter !== "all", orderTypeFilter !== "all"].filter(Boolean).length}
+                  {[dateFilter !== "all", statusFilter !== "all", orderTypeFilter !== "all", categoryFilter !== "all"].filter(Boolean).length}
                 </span>
               )}
             </Button>
@@ -237,6 +308,24 @@ export default function CustomerOrders() {
                   </Select>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="none">Uncategorised</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {hasActiveFilters && (
                   <div className="md:col-span-3 flex justify-end">
                     <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -296,6 +385,12 @@ export default function CustomerOrders() {
                       <div className="text-right capitalize">
                         {order.order_type}
                       </div>
+                      <div className="text-muted-foreground text-xs">
+                        Category
+                      </div>
+                      <div className="text-right">
+                        {order.order_category || "-"}
+                      </div>
                       {/* <div className="text-muted-foreground text-xs">
                         Priority
                       </div>
@@ -319,6 +414,17 @@ export default function CustomerOrders() {
                         {formatCurrency(order.total_charges ?? 0)}
                       </div>
                     </div>
+                    {order.label_path && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={(e) => handleLabelDownload(order, e)}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Shipping Label
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -330,6 +436,7 @@ export default function CustomerOrders() {
                     <thead>
                       <tr>
                         <th>Order Number</th>
+                        <th>Category</th>
                         <th>Item Names</th>
                         <th>Warehouse</th>
                         <th>Type</th>
@@ -340,6 +447,7 @@ export default function CustomerOrders() {
                         {/* <th>Scheduled</th> */}
                         <th>Completed</th>
                         <th>Charges</th>
+                        <th>Label</th>
                         {/* <th>Contact</th> */}
                         {/* <th>City</th> */}
                       </tr>
@@ -353,6 +461,9 @@ export default function CustomerOrders() {
                         >
                           <td className="font-medium whitespace-nowrap">
                             {order.order_number}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {order.order_category || "-"}
                           </td>
                           <td className="whitespace-nowrap">
                             {order.outbound_order_items
@@ -396,6 +507,20 @@ export default function CustomerOrders() {
                           </td>
                           <td className="font-medium whitespace-nowrap">
                             {formatCurrency(order.total_charges ?? 0)}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {order.label_path ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Download shipping label"
+                                onClick={(e) => handleLabelDownload(order, e)}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              "-"
+                            )}
                           </td>
                           {/* <td className="whitespace-nowrap">
                             {order.delivery_contact_name || "-"}

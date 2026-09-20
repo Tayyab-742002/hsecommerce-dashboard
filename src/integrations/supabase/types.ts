@@ -374,6 +374,10 @@ export type Database = {
           handling_charges: number | null
           id: string
           notes: string | null
+          label_path: string | null
+          label_uploaded_at: string | null
+          order_category: string | null
+          viewed_at: string | null
           order_number: string
           order_type: string | null
           priority: string | null
@@ -403,6 +407,10 @@ export type Database = {
           handling_charges?: number | null
           id?: string
           notes?: string | null
+          label_path?: string | null
+          label_uploaded_at?: string | null
+          order_category?: string | null
+          viewed_at?: string | null
           order_number: string
           order_type?: string | null
           priority?: string | null
@@ -432,6 +440,10 @@ export type Database = {
           handling_charges?: number | null
           id?: string
           notes?: string | null
+          label_path?: string | null
+          label_uploaded_at?: string | null
+          order_category?: string | null
+          viewed_at?: string | null
           order_number?: string
           order_type?: string | null
           priority?: string | null

@@ -4,7 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Plus, Search, RefreshCw, Trash2, Filter, X, CalendarIcon } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Filter, X, CalendarIcon, Download } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { downloadLabel, downloadMergedLabels, removeLabel } from "@/lib/labels";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +53,10 @@ interface Order {
   order_number: string;
   status: string;
   order_type: string;
+  customer_id: string;
+  order_category: string | null;
+  label_path: string | null;
+  viewed_at: string | null;
   requested_date: string;
   scheduled_date: string | null;
   completed_date: string | null;
@@ -93,10 +100,35 @@ export default function AdminOrders() {
   const [customDate, setCustomDate] = useState<Date | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [downloadingLabels, setDownloadingLabels] = useState(false);
 
   useEffect(() => {
     fetchOrders();
+  }, []);
+
+  // Live notification when a customer submits a new order
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-new-orders")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "outbound_orders" },
+        (payload) => {
+          const order = payload.new as { order_number: string };
+          toast.info(`New order ${order.order_number} requested`, {
+            description: "Click Refresh or reopen the page to review it",
+          });
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchOrders = async () => {
@@ -182,8 +214,19 @@ export default function AdminOrders() {
     // Order type filter
     const matchesOrderType =
       orderTypeFilter === "all" || order.order_type === orderTypeFilter;
-    
-    return matchesSearch && matchesDate && matchesStatus && matchesOrderType;
+
+    // Categories are per customer, so a filter value is "{customer_id}::{category}"
+    const matchesCategory =
+      categoryFilter === "all" ||
+      categoryFilter === `${order.customer_id}::${order.order_category ?? ""}`;
+
+    return (
+      matchesSearch &&
+      matchesDate &&
+      matchesStatus &&
+      matchesOrderType &&
+      matchesCategory
+    );
   });
 
   // Clear all filters
@@ -192,6 +235,7 @@ export default function AdminOrders() {
     setCustomDate(undefined);
     setStatusFilter("all");
     setOrderTypeFilter("all");
+    setCategoryFilter("all");
     setSearchTerm("");
   };
 
@@ -200,7 +244,21 @@ export default function AdminOrders() {
     customDate !== undefined ||
     statusFilter !== "all" || 
     orderTypeFilter !== "all" || 
+    categoryFilter !== "all" ||
     searchTerm !== "";
+
+  // Folder list for the filter: one entry per customer + category pair, so the same
+  // folder name used by two customers stays two distinct folders.
+  const categoryOptions = [
+    ...new Map(
+      orders
+        .filter((order) => order.order_category)
+        .map((order) => [
+          `${order.customer_id}::${order.order_category}`,
+          `${order.customers?.company_name || order.customers?.contact_person} · ${order.order_category}`,
+        ])
+    ).entries(),
+  ].sort((a, b) => a[1].localeCompare(b[1]));
 
   // Handle date filter change - clear custom date when preset is selected
   const handleDateFilterChange = (value: string) => {
@@ -229,6 +287,76 @@ export default function AdminOrders() {
   const handleOrderClick = (orderId: string) => {
     setSelectedOrderId(orderId);
     setDetailsDialogOpen(true);
+    markViewed(orderId);
+  };
+
+  // First admin to open an order clears it from the "new" badge
+  const markViewed = async (orderId: string) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order || order.viewed_at) return;
+
+    const viewedAt = new Date().toISOString();
+    await supabase
+      .from("outbound_orders")
+      .update({ viewed_at: viewedAt })
+      .eq("id", orderId);
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, viewed_at: viewedAt } : o))
+    );
+  };
+
+  const toggleSelected = (orderId: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(orderId)
+        ? prev.filter((id) => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  const selectableIds = filteredOrders
+    .filter((order) => order.label_path)
+    .map((order) => order.id);
+  const allSelected =
+    selectableIds.length > 0 &&
+    selectableIds.every((id) => selectedIds.includes(id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? [] : selectableIds);
+  };
+
+  const handleSingleLabel = async (order: Order, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!order.label_path) return;
+    try {
+      await downloadLabel(order.label_path, order.order_number);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to download label"
+      );
+    }
+  };
+
+  // Merges every selected order's label into one PDF, in the order shown on screen
+  const handleMergedLabels = async () => {
+    const selected = filteredOrders.filter(
+      (order) => selectedIds.includes(order.id) && order.label_path
+    );
+    if (selected.length === 0) return;
+
+    setDownloadingLabels(true);
+    try {
+      await downloadMergedLabels(
+        selected.map((order) => order.label_path as string),
+        `labels-${new Date().toISOString().split("T")[0]}.pdf`
+      );
+      toast.success(`Merged ${selected.length} labels`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to merge labels"
+      );
+    } finally {
+      setDownloadingLabels(false);
+    }
   };
 
   const handleDeleteClick = (orderId: string, e: React.MouseEvent) => {
@@ -241,13 +369,19 @@ export default function AdminOrders() {
     if (!orderToDelete) return;
 
     try {
+      const labelPath = orders.find((o) => o.id === orderToDelete)?.label_path;
+
       const { error } = await supabase
         .from("outbound_orders")
         .delete()
         .eq("id", orderToDelete);
 
       if (error) throw error;
+
+      // Stock is returned by the order item delete triggers; drop the orphaned label
+      if (labelPath) await removeLabel(labelPath);
       toast.success("Order deleted successfully");
+      setSelectedIds((prev) => prev.filter((id) => id !== orderToDelete));
       fetchOrders();
     } catch (error: unknown) {
       const message =
@@ -339,7 +473,7 @@ export default function AdminOrders() {
               Filters
               {hasActiveFilters && (
                 <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
-                  {[dateFilter !== "all" || customDate !== undefined, statusFilter !== "all", orderTypeFilter !== "all", searchTerm !== ""].filter(Boolean).length}
+                  {[dateFilter !== "all" || customDate !== undefined, statusFilter !== "all", orderTypeFilter !== "all", categoryFilter !== "all", searchTerm !== ""].filter(Boolean).length}
                 </span>
               )}
             </Button>
@@ -434,12 +568,54 @@ export default function AdminOrders() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Category Filter — customer + folder */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categoryOptions.map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
           
-          {/* Results Count */}
-          <div className="text-sm text-muted-foreground">
-            Showing {filteredOrders.length} of {orders.length} orders
+          {/* Results Count + bulk label download */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredOrders.length} of {orders.length} orders
+              {selectedIds.length > 0 && ` · ${selectedIds.length} selected`}
+            </div>
+            {selectedIds.length > 0 && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleMergedLabels}
+                  disabled={downloadingLabels}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {downloadingLabels
+                    ? "Merging..."
+                    : `Download ${selectedIds.length} Labels (1 PDF)`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedIds([])}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -463,16 +639,27 @@ export default function AdminOrders() {
                   >
                     {/* Title row — truncate long item names, badge never wraps */}
                     <div className="flex items-start justify-between gap-2">
+                      {order.label_path && (
+                        <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.includes(order.id)}
+                            onCheckedChange={() => toggleSelected(order.id)}
+                            aria-label="Select order"
+                          />
+                        </div>
+                      )}
                       <div className="font-semibold text-sm leading-snug line-clamp-2 min-w-0 flex-1">
                         {order.outbound_order_items
                           ?.map((item) => item.order_item)
                           .filter(Boolean)
                           .join(", ") || "-"}
                       </div>
-                      <div className="shrink-0">
+                      <div className="shrink-0 flex items-center gap-1.5">
+                        {!order.viewed_at && <Badge variant="default">New</Badge>}
                         <StatusBadge status={order.status} />
                       </div>
                     </div>
+
 
                     <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
                       <div className="text-muted-foreground text-xs">Customer</div>
@@ -488,6 +675,11 @@ export default function AdminOrders() {
                       <div className="text-muted-foreground text-xs">Type</div>
                       <div className="text-right text-xs capitalize">
                         {order.order_type}
+                      </div>
+
+                      <div className="text-muted-foreground text-xs">Category</div>
+                      <div className="text-right text-xs truncate">
+                        {order.order_category || "-"}
                       </div>
 
                       <div className="text-muted-foreground text-xs">Items</div>
@@ -510,6 +702,15 @@ export default function AdminOrders() {
                       className="mt-3 flex justify-end gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {order.label_path && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => handleSingleLabel(order, e)}
+                        >
+                          <Download className="h-4 w-4 mr-1" /> Label
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -535,11 +736,22 @@ export default function AdminOrders() {
                   <table className="w-full border-collapse text-sm">
                     <thead className="sticky top-0 z-10 bg-card">
                       <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                        <th className="px-3 py-3 text-left font-medium w-10">
+                          <Checkbox
+                            checked={allSelected}
+                            onCheckedChange={toggleSelectAll}
+                            disabled={selectableIds.length === 0}
+                            aria-label="Select all orders with labels"
+                          />
+                        </th>
                         <th className="px-3 py-3 text-left font-medium">
                           Item Names
                         </th>
                         <th className="px-3 py-3 text-left font-medium">
                           Customer
+                        </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Category
                         </th>
                         <th className="px-3 py-3 text-left font-medium">
                           Warehouse
@@ -568,6 +780,9 @@ export default function AdminOrders() {
                         <th className="px-3 py-3 text-left font-medium">
                           Charges
                         </th>
+                        <th className="px-3 py-3 text-left font-medium">
+                          Label
+                        </th>
                         {/* <th className="px-3 py-3 text-left font-medium">
                           Contact
                         </th> */}
@@ -583,10 +798,30 @@ export default function AdminOrders() {
                       {filteredOrders.map((order) => (
                         <tr
                           key={order.id}
-                          className="border-b border-border/60 last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors"
+                          className={cn(
+                            "border-b border-border/60 last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors",
+                            !order.viewed_at && "bg-primary/5"
+                          )}
                           onClick={() => handleOrderClick(order.id)}
                         >
+                          <td
+                            className="px-3 py-3"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {order.label_path && (
+                              <Checkbox
+                                checked={selectedIds.includes(order.id)}
+                                onCheckedChange={() => toggleSelected(order.id)}
+                                aria-label="Select order"
+                              />
+                            )}
+                          </td>
                           <td className="px-3 py-3 font-medium max-w-[200px]">
+                            {!order.viewed_at && (
+                              <Badge variant="default" className="mr-2">
+                                New
+                              </Badge>
+                            )}
                             <span className="block truncate" title={
                               order.outbound_order_items
                                 ?.map((item) => item.order_item)
@@ -602,6 +837,9 @@ export default function AdminOrders() {
                           <td className="px-3 py-3 whitespace-nowrap">
                             {order.customers?.company_name ||
                               order.customers?.contact_person}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {order.order_category || "-"}
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap">
                             {order.warehouses?.warehouse_name}
@@ -642,6 +880,23 @@ export default function AdminOrders() {
                           </td>
                           <td className="px-3 py-3 font-medium whitespace-nowrap">
                             {formatCurrency(order.total_charges ?? 0)}
+                          </td>
+                          <td
+                            className="px-3 py-3"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {order.label_path ? (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title="Download shipping label"
+                                onClick={(e) => handleSingleLabel(order, e)}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              "-"
+                            )}
                           </td>
                           {/* <td className="px-3 py-3 whitespace-nowrap">
                             {order.delivery_contact_name || "-"}
