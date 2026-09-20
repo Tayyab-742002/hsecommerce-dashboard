@@ -68,10 +68,17 @@ export default function OrderWizard({ onComplete, customerId }: OrderWizardProps
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryContainerRef = useRef<HTMLDivElement>(null);
+
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const customerInputRef = useRef<HTMLInputElement>(null);
   const customerContainerRef = useRef<HTMLDivElement>(null);
+
+  const matchingCategories = categories.filter((category) =>
+    category.toLowerCase().includes(orderData.order_category.trim().toLowerCase())
+  );
 
   const filteredCustomers = customers.filter((c) => {
     const q = customerSearch.toLowerCase();
@@ -429,19 +436,46 @@ export default function OrderWizard({ onComplete, customerId }: OrderWizardProps
 
           <div className="space-y-2">
             <Label>Category / Folder</Label>
-            <Input
-              list="order-category-options"
-              placeholder="e.g. T-Shirts"
-              value={orderData.order_category}
-              onChange={(e) =>
-                setOrderData({ ...orderData, order_category: e.target.value })
-              }
-            />
-            <datalist id="order-category-options">
-              {categories.map((category) => (
-                <option key={category} value={category} />
-              ))}
-            </datalist>
+            <div
+              ref={categoryContainerRef}
+              className="relative"
+              onBlur={(e) => {
+                if (
+                  !categoryContainerRef.current?.contains(
+                    e.relatedTarget as Node
+                  )
+                ) {
+                  setCategoryDropdownOpen(false);
+                }
+              }}
+            >
+              <Input
+                placeholder="e.g. T-Shirts"
+                value={orderData.order_category}
+                onChange={(e) => {
+                  setOrderData({ ...orderData, order_category: e.target.value });
+                  setCategoryDropdownOpen(true);
+                }}
+                onFocus={() => setCategoryDropdownOpen(true)}
+              />
+              {categoryDropdownOpen && matchingCategories.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+                  {matchingCategories.map((category) => (
+                    <div
+                      key={category}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setOrderData({ ...orderData, order_category: category });
+                        setCategoryDropdownOpen(false);
+                      }}
+                    >
+                      {category}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               Pick an existing folder or type a new name to create one
             </p>
