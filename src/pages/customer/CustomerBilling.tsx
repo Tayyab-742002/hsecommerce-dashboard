@@ -6,6 +6,7 @@ import Spinner from "@/components/Spinner";
 import { formatCurrency } from "@/lib/currency";
 import { PoundSterling, TrendingUp, Package } from "lucide-react";
 import TablePagination from "@/components/TablePagination";
+import CustomerInvoices from "@/components/CustomerInvoices";
 import { usePagedQuery } from "@/hooks/usePagedQuery";
 
 export default function CustomerBilling() {
@@ -98,9 +99,11 @@ export default function CustomerBilling() {
         />
       </div>
 
+      <CustomerInvoices customerId={customerId} />
+
       <Card>
         <CardHeader>
-          <CardTitle>Recent Charges</CardTitle>
+          <CardTitle>Order Charges</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (

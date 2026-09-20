@@ -9,6 +9,7 @@ import {
   Users,
   FileText,
   Settings,
+  Receipt,
   LogOut,
   Menu,
   User,
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Inventory", href: "/admin/inventory", icon: PackageSearch },
   { name: "Pallets", href: "/admin/pallets", icon: Layers },
   { name: "Orders", href: "/admin/orders", icon: Package },
+  { name: "Invoices", href: "/admin/invoices", icon: Receipt },
   { name: "Reports", href: "/admin/reports", icon: FileText },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
