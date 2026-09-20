@@ -27,6 +27,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import TablePagination from "@/components/TablePagination";
+import { usePagination } from "@/hooks/usePagination";
 
 
 interface Pallet {
@@ -217,6 +219,8 @@ export default function AdminPallets() {
     return remaining > 0 ? `${preview} +${remaining} more` : preview;
   };
 
+  const { pageItems: pagedPallets, ...pagination } = usePagination(filteredPallets);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -308,7 +312,7 @@ export default function AdminPallets() {
           )}
 
           <div className="text-sm text-muted-foreground">
-            Showing {filteredPallets.length} of {pallets.length} pallets
+            {filteredPallets.length} of {pallets.length} pallets match the filters
           </div>
         </CardHeader>
 
@@ -324,7 +328,7 @@ export default function AdminPallets() {
                 No pallets found
               </div>
             ) : (
-              filteredPallets.map((pallet) => (
+              pagedPallets.map((pallet) => (
                 <div
                   key={pallet.id}
                   className="rounded-lg border border-border bg-card p-3 shadow-sm"
@@ -396,7 +400,7 @@ export default function AdminPallets() {
                       </td>
                     </tr>
                   ) : (
-                    filteredPallets.map((pallet) => (
+                    pagedPallets.map((pallet) => (
                       <tr
                         key={pallet.id}
                         className="border-b border-border/60 last:border-b-0"
@@ -462,6 +466,11 @@ export default function AdminPallets() {
               </table>
             </div>
           </div>
+        <TablePagination
+          {...pagination}
+          label="pallets"
+          onPageChange={pagination.setPage}
+        />
         </CardContent>
       </Card>
 

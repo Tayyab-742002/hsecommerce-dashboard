@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import TablePagination from "@/components/TablePagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Pallet {
   id: string;
@@ -109,6 +111,8 @@ export default function CustomerPallets() {
 
   const inStorage = pallets.filter((p) => p.status === "in_storage").length;
   const partiallyPicked = pallets.filter((p) => p.status === "partially_picked").length;
+
+  const { pageItems: pagedPallets, ...pagination } = usePagination(filteredPallets);
 
   return (
     <div className="space-y-6">
@@ -206,7 +210,7 @@ export default function CustomerPallets() {
           )}
 
           <div className="text-sm text-muted-foreground">
-            Showing {filteredPallets.length} of {pallets.length} pallets
+            {filteredPallets.length} of {pallets.length} pallets match the filters
           </div>
         </CardHeader>
 
@@ -222,7 +226,7 @@ export default function CustomerPallets() {
                 No pallets found
               </div>
             ) : (
-              filteredPallets.map((pallet) => (
+              pagedPallets.map((pallet) => (
                 <div
                   key={pallet.id}
                   className="rounded-lg border border-border bg-card p-3 shadow-sm"
@@ -287,7 +291,7 @@ export default function CustomerPallets() {
                       </td>
                     </tr>
                   ) : (
-                    filteredPallets.map((pallet) => (
+                    pagedPallets.map((pallet) => (
                       <tr
                         key={pallet.id}
                         className="border-b border-border/60 last:border-b-0"
@@ -329,6 +333,11 @@ export default function CustomerPallets() {
               </table>
             </div>
           </div>
+        <TablePagination
+          {...pagination}
+          label="pallets"
+          onPageChange={pagination.setPage}
+        />
         </CardContent>
       </Card>
 

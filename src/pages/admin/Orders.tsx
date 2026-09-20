@@ -47,6 +47,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import TablePagination from "@/components/TablePagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Order {
   id: string;
@@ -229,6 +231,8 @@ export default function AdminOrders() {
     );
   });
 
+  const { pageItems: pagedOrders, ...pagination } = usePagination(filteredOrders);
+
   // Clear all filters
   const clearFilters = () => {
     setDateFilter("all");
@@ -313,7 +317,8 @@ export default function AdminOrders() {
     );
   };
 
-  const selectableIds = filteredOrders
+  // Scoped to the page on screen — selections made on other pages are kept
+  const selectableIds = pagedOrders
     .filter((order) => order.label_path)
     .map((order) => order.id);
   const allSelected =
@@ -321,7 +326,11 @@ export default function AdminOrders() {
     selectableIds.every((id) => selectedIds.includes(id));
 
   const toggleSelectAll = () => {
-    setSelectedIds(allSelected ? [] : selectableIds);
+    setSelectedIds((prev) =>
+      allSelected
+        ? prev.filter((id) => !selectableIds.includes(id))
+        : [...new Set([...prev, ...selectableIds])]
+    );
   };
 
   const handleSingleLabel = async (order: Order, e: React.MouseEvent) => {
@@ -592,7 +601,7 @@ export default function AdminOrders() {
           {/* Results Count + bulk label download */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
-              Showing {filteredOrders.length} of {orders.length} orders
+              {filteredOrders.length} of {orders.length} orders match the filters
               {selectedIds.length > 0 && ` · ${selectedIds.length} selected`}
             </div>
             {selectedIds.length > 0 && (
@@ -631,7 +640,7 @@ export default function AdminOrders() {
             <>
               {/* Mobile: card list */}
               <div className="space-y-3 sm:hidden">
-                {filteredOrders.map((order) => (
+                {pagedOrders.map((order) => (
                   <div
                     key={order.id}
                     className="rounded-lg border border-border bg-card p-3 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
@@ -795,7 +804,7 @@ export default function AdminOrders() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredOrders.map((order) => (
+                      {pagedOrders.map((order) => (
                         <tr
                           key={order.id}
                           className={cn(
@@ -933,6 +942,11 @@ export default function AdminOrders() {
                   </table>
                 </div>
               </div>
+            <TablePagination
+              {...pagination}
+              label="orders"
+              onPageChange={pagination.setPage}
+            />
             </>
           )}
         </CardContent>
