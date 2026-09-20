@@ -14,7 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import TablePagination from "@/components/TablePagination";
-import { usePagination } from "@/hooks/usePagination";
+import { usePagedQuery } from "@/hooks/usePagedQuery";
+import { useDebounced } from "@/hooks/useDebounced";
+import { dateFilterRange, likeTerm } from "@/lib/dateRange";
 
 interface InventoryItem {
   id: string;
@@ -39,105 +41,87 @@ interface InventoryItem {
 }
 
 export default function CustomerInventory() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerLoading, setCustomerLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
 
+  const debouncedSearch = useDebounced(searchTerm);
+
   useEffect(() => {
-    fetchInventory();
+    resolveCustomer();
   }, []);
 
-  const fetchInventory = async () => {
+  const resolveCustomer = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setCustomerLoading(false);
+      return;
+    }
 
-    const { data: userRole, error: roleError } = await supabase
+    const { data: userRole } = await supabase
       .from("user_roles")
       .select("customer_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // If no role found or no customer_id, user cannot access customer inventory
-    if (roleError || !userRole?.customer_id) {
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("inventory_items")
-      .select(
-        `
-        *,
-        warehouses (warehouse_name)
-      `
-      )
-      .eq("customer_id", userRole.customer_id)
-      .order("received_date", { ascending: false });
-
-    if (!error && data) {
-      setItems(data as InventoryItem[]);
-    }
-    setLoading(false);
+    setCustomerId(userRole?.customer_id ?? null);
+    setCustomerLoading(false);
   };
 
-  // Helper function to filter by date
-  const filterByDate = (item: InventoryItem) => {
-    if (dateFilter === "all") return true;
-    
-    // Extract date parts from the item date string (format: YYYY-MM-DD)
-    const itemDateStr = item.received_date.split('T')[0]; // Get just the date part
-    const [itemYear, itemMonth, itemDay] = itemDateStr.split('-').map(Number);
-    
-    // Create date objects at midnight local time
-    const itemDate = new Date(itemYear, itemMonth - 1, itemDay);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    switch (dateFilter) {
-      case "today":
-        const todayYear = today.getFullYear();
-        const todayMonth = today.getMonth();
-        const todayDay = today.getDate();
-        return itemYear === todayYear && itemMonth - 1 === todayMonth && itemDay === todayDay;
-      case "week":
-        const weekAgo = new Date(today);
-        weekAgo.setDate(today.getDate() - 7);
-        return itemDate >= weekAgo && itemDate <= today;
-      case "month":
-        const monthAgo = new Date(today);
-        monthAgo.setDate(today.getDate() - 30); // Last 30 days
-        return itemDate >= monthAgo && itemDate <= today;
-      default:
-        return true;
-    }
-  };
+  const items = usePagedQuery<InventoryItem>(
+    customerId
+      ? () => {
+          let query = supabase
+            .from("inventory_items")
+            .select("*, warehouses (warehouse_name)", { count: "exact" })
+            .eq("customer_id", customerId);
 
-  const filteredItems = items.filter((item) => {
-    // Search filter
-    const matchesSearch =
-      item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.item_name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Date filter
-    const matchesDate = filterByDate(item);
-    
-    // Status filter
-    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-    
-    // Category filter
-    const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
-    
-    return matchesSearch && matchesDate && matchesStatus && matchesCategory;
-  });
+          const term = debouncedSearch.trim();
+          if (term) {
+            query = query.or(
+              [
+                `item_code.ilike.${likeTerm(term)}`,
+                `item_name.ilike.${likeTerm(term)}`,
+              ].join(",")
+            );
+          }
 
-  // Get unique categories for filter
-  const categories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
+          const range = dateFilterRange(dateFilter);
+          if (range) {
+            query = query
+              .gte("received_date", range.from)
+              .lte("received_date", range.to);
+          }
+
+          if (statusFilter !== "all") query = query.eq("status", statusFilter);
+          if (categoryFilter !== "all") {
+            query = query.eq("category", categoryFilter);
+          }
+
+          return query
+            .order("received_date", { ascending: false })
+            .returns<InventoryItem[]>();
+        }
+      : null,
+    [customerId, debouncedSearch, dateFilter, statusFilter, categoryFilter]
+  );
+
+  const loading = customerLoading || items.loading;
+
+  // Category options for this customer, fetched separately from the page of rows
+  const [categories, setCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    supabase
+      .rpc("inventory_category_options")
+      .then(({ data }) => setCategories((data ?? []).map((row) => row.category)));
+  }, []);
 
   const clearFilters = () => {
     setDateFilter("all");
@@ -147,7 +131,6 @@ export default function CustomerInventory() {
 
   const hasActiveFilters = dateFilter !== "all" || statusFilter !== "all" || categoryFilter !== "all";
 
-  const { pageItems: pagedItems, ...pagination } = usePagination(filteredItems);
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -248,7 +231,6 @@ export default function CustomerInventory() {
             )}
 
             <div className="text-sm text-muted-foreground">
-              {filteredItems.length} of {items.length} items match the filters
             </div>
           </div>
         </CardHeader>
@@ -257,7 +239,7 @@ export default function CustomerInventory() {
             <div className="flex items-center justify-center py-12">
               <Spinner label="Loading inventory" />
             </div>
-          ) : filteredItems.length === 0 ? (
+          ) : items.rows.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No inventory items found
             </div>
@@ -265,7 +247,7 @@ export default function CustomerInventory() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
-                {pagedItems.map((item) => (
+                {items.rows.map((item) => (
                   <div
                     key={item.id}
                     className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
@@ -345,7 +327,7 @@ export default function CustomerInventory() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pagedItems.map((item) => (
+                      {items.rows.map((item) => (
                         <tr key={item.id}>
                           <td className="font-medium whitespace-nowrap">
                             {item.item_code}
@@ -398,10 +380,14 @@ export default function CustomerInventory() {
                 </div>
               </div>
             <TablePagination
-              {...pagination}
-              label="items"
-              onPageChange={pagination.setPage}
-            />
+            page={items.page}
+            pageCount={items.pageCount}
+            from={items.from}
+            to={items.to}
+            total={items.total}
+            onPageChange={items.setPage}
+            label="items"
+          />
             </>
           )}
         </CardContent>

@@ -48,7 +48,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import TablePagination from "@/components/TablePagination";
-import { usePagination } from "@/hooks/usePagination";
+import { usePagedQuery } from "@/hooks/usePagedQuery";
+import { useDebounced } from "@/hooks/useDebounced";
+import { dateFilterRange, likeTerm } from "@/lib/dateRange";
+import { useCustomerMatches } from "@/hooks/useCustomerMatches";
 
 interface Order {
   id: string;
@@ -81,10 +84,15 @@ interface Order {
   }>;
 }
 
+/** A selected order, kept in full so a merge can span pages we no longer hold. */
+interface SelectedLabel {
+  id: string;
+  orderNumber: string;
+  labelPath: string;
+}
+
 export default function AdminOrders() {
-  const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
@@ -104,12 +112,79 @@ export default function AdminOrders() {
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selected, setSelected] = useState<SelectedLabel[]>([]);
   const [downloadingLabels, setDownloadingLabels] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
+  const debouncedSearch = useDebounced(searchTerm);
 
+  // Folder list for the filter — its own query, since a page holds only 25 orders
   useEffect(() => {
-    fetchOrders();
+    supabase.rpc("order_category_options").then(({ data }) =>
+      setCategoryOptions(
+        (data ?? []).map((row) => ({
+          value: `${row.customer_id}::${row.order_category}`,
+          label: `${row.customer_name} · ${row.order_category}`,
+        }))
+      )
+    );
   }, []);
+
+  const customerMatches = useCustomerMatches(debouncedSearch);
+
+  const orders = usePagedQuery<Order>(
+    () => {
+      let query = supabase.from("outbound_orders").select(
+        `
+        *,
+        customers (company_name, contact_person),
+        warehouses (warehouse_name),
+        outbound_order_items (order_item, quantity)
+      `,
+        { count: "exact" }
+      );
+
+      const term = debouncedSearch.trim();
+      if (term) {
+        const clauses = [`order_number.ilike.${likeTerm(term)}`];
+        if (customerMatches?.length) {
+          clauses.push(`customer_id.in.(${customerMatches.join(",")})`);
+        }
+        query = query.or(clauses.join(","));
+      }
+
+      const range = dateFilterRange(dateFilter, customDate);
+      if (range) {
+        query = query
+          .gte("requested_date", range.from)
+          .lte("requested_date", range.to);
+      }
+
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (orderTypeFilter !== "all") {
+        query = query.eq("order_type", orderTypeFilter);
+      }
+      if (categoryFilter !== "all") {
+        const [customerId, category] = categoryFilter.split("::");
+        query = query.eq("customer_id", customerId).eq("order_category", category);
+      }
+
+      return query.order("created_at", { ascending: false }).returns<Order[]>();
+    },
+    [
+      debouncedSearch,
+      customerMatches,
+      dateFilter,
+      customDate?.toDateString() ?? null,
+      statusFilter,
+      orderTypeFilter,
+      categoryFilter,
+    ]
+  );
+
+  const loading = orders.loading;
+  const fetchOrders = orders.refetch;
 
   // Live notification when a customer submits a new order
   useEffect(() => {
@@ -121,9 +196,9 @@ export default function AdminOrders() {
         (payload) => {
           const order = payload.new as { order_number: string };
           toast.info(`New order ${order.order_number} requested`, {
-            description: "Click Refresh or reopen the page to review it",
+            description: "Added to the list below",
           });
-          fetchOrders();
+          orders.refetch();
         }
       )
       .subscribe();
@@ -132,106 +207,6 @@ export default function AdminOrders() {
       supabase.removeChannel(channel);
     };
   }, []);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("outbound_orders")
-      .select(
-        `
-        *,
-        customers (company_name, contact_person),
-        warehouses (warehouse_name),
-        outbound_order_items (order_item, quantity)
-      `
-      )
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setOrders(data as unknown as Order[]);
-    }
-    setLoading(false);
-  };
-
-  // Helper function to filter by date
-  const filterByDate = (order: Order) => {
-    // If custom date is selected, use it instead of dateFilter
-    if (customDate) {
-      const orderDateStr = order.requested_date.split('T')[0];
-      const [orderYear, orderMonth, orderDay] = orderDateStr.split('-').map(Number);
-      const orderDate = new Date(orderYear, orderMonth - 1, orderDay);
-      
-      const selectedDate = new Date(customDate);
-      selectedDate.setHours(0, 0, 0, 0);
-      orderDate.setHours(0, 0, 0, 0);
-      
-      return orderDate.getTime() === selectedDate.getTime();
-    }
-    
-    if (dateFilter === "all") return true;
-    
-    // Extract date parts from the order date string (format: YYYY-MM-DD)
-    const orderDateStr = order.requested_date.split('T')[0]; // Get just the date part
-    const [orderYear, orderMonth, orderDay] = orderDateStr.split('-').map(Number);
-    
-    // Create date objects at midnight local time
-    const orderDate = new Date(orderYear, orderMonth - 1, orderDay);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    switch (dateFilter) {
-      case "today":
-        const todayYear = today.getFullYear();
-        const todayMonth = today.getMonth();
-        const todayDay = today.getDate();
-        return orderYear === todayYear && orderMonth - 1 === todayMonth && orderDay === todayDay;
-      case "week":
-        const weekAgo = new Date(today);
-        weekAgo.setDate(today.getDate() - 7);
-        return orderDate >= weekAgo && orderDate <= today;
-      case "month":
-        const monthAgo = new Date(today);
-        monthAgo.setDate(today.getDate() - 30); // Last 30 days
-        return orderDate >= monthAgo && orderDate <= today;
-      default:
-        return true;
-    }
-  };
-
-  const filteredOrders = orders.filter((order) => {
-    // Search filter
-    const matchesSearch =
-      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customers?.company_name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
-    
-    // Date filter
-    const matchesDate = filterByDate(order);
-    
-    // Status filter
-    const matchesStatus =
-      statusFilter === "all" || order.status === statusFilter;
-    
-    // Order type filter
-    const matchesOrderType =
-      orderTypeFilter === "all" || order.order_type === orderTypeFilter;
-
-    // Categories are per customer, so a filter value is "{customer_id}::{category}"
-    const matchesCategory =
-      categoryFilter === "all" ||
-      categoryFilter === `${order.customer_id}::${order.order_category ?? ""}`;
-
-    return (
-      matchesSearch &&
-      matchesDate &&
-      matchesStatus &&
-      matchesOrderType &&
-      matchesCategory
-    );
-  });
-
-  const { pageItems: pagedOrders, ...pagination } = usePagination(filteredOrders);
 
   // Clear all filters
   const clearFilters = () => {
@@ -251,18 +226,6 @@ export default function AdminOrders() {
     categoryFilter !== "all" ||
     searchTerm !== "";
 
-  // Folder list for the filter: one entry per customer + category pair, so the same
-  // folder name used by two customers stays two distinct folders.
-  const categoryOptions = [
-    ...new Map(
-      orders
-        .filter((order) => order.order_category)
-        .map((order) => [
-          `${order.customer_id}::${order.order_category}`,
-          `${order.customers?.company_name || order.customers?.contact_person} · ${order.order_category}`,
-        ])
-    ).entries(),
-  ].sort((a, b) => a[1].localeCompare(b[1]));
 
   // Handle date filter change - clear custom date when preset is selected
   const handleDateFilterChange = (value: string) => {
@@ -296,40 +259,55 @@ export default function AdminOrders() {
 
   // First admin to open an order clears it from the "new" badge
   const markViewed = async (orderId: string) => {
-    const order = orders.find((o) => o.id === orderId);
+    const order = orders.rows.find((o) => o.id === orderId);
     if (!order || order.viewed_at) return;
 
-    const viewedAt = new Date().toISOString();
     await supabase
       .from("outbound_orders")
-      .update({ viewed_at: viewedAt })
+      .update({ viewed_at: new Date().toISOString() })
       .eq("id", orderId);
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, viewed_at: viewedAt } : o))
-    );
+    orders.refetch();
   };
 
-  const toggleSelected = (orderId: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(orderId)
-        ? prev.filter((id) => id !== orderId)
-        : [...prev, orderId]
+  const isSelected = (orderId: string) =>
+    selected.some((entry) => entry.id === orderId);
+
+  const toggleSelected = (order: Order) => {
+    if (!order.label_path) return;
+    setSelected((prev) =>
+      prev.some((entry) => entry.id === order.id)
+        ? prev.filter((entry) => entry.id !== order.id)
+        : [
+            ...prev,
+            {
+              id: order.id,
+              orderNumber: order.order_number,
+              labelPath: order.label_path as string,
+            },
+          ]
     );
   };
 
   // Scoped to the page on screen — selections made on other pages are kept
-  const selectableIds = pagedOrders
-    .filter((order) => order.label_path)
-    .map((order) => order.id);
+  const selectableOrders = orders.rows.filter((order) => order.label_path);
   const allSelected =
-    selectableIds.length > 0 &&
-    selectableIds.every((id) => selectedIds.includes(id));
+    selectableOrders.length > 0 && selectableOrders.every((o) => isSelected(o.id));
 
   const toggleSelectAll = () => {
-    setSelectedIds((prev) =>
+    const pageIds = selectableOrders.map((order) => order.id);
+    setSelected((prev) =>
       allSelected
-        ? prev.filter((id) => !selectableIds.includes(id))
-        : [...new Set([...prev, ...selectableIds])]
+        ? prev.filter((entry) => !pageIds.includes(entry.id))
+        : [
+            ...prev,
+            ...selectableOrders
+              .filter((order) => !prev.some((entry) => entry.id === order.id))
+              .map((order) => ({
+                id: order.id,
+                orderNumber: order.order_number,
+                labelPath: order.label_path as string,
+              })),
+          ]
     );
   };
 
@@ -345,17 +323,15 @@ export default function AdminOrders() {
     }
   };
 
-  // Merges every selected order's label into one PDF, in the order shown on screen
+  // Merges every selected label into one PDF, in the order they were selected.
+  // Works across pages because the selection carries its own label paths.
   const handleMergedLabels = async () => {
-    const selected = filteredOrders.filter(
-      (order) => selectedIds.includes(order.id) && order.label_path
-    );
     if (selected.length === 0) return;
 
     setDownloadingLabels(true);
     try {
       await downloadMergedLabels(
-        selected.map((order) => order.label_path as string),
+        selected.map((entry) => entry.labelPath),
         `labels-${new Date().toISOString().split("T")[0]}.pdf`
       );
       toast.success(`Merged ${selected.length} labels`);
@@ -378,7 +354,7 @@ export default function AdminOrders() {
     if (!orderToDelete) return;
 
     try {
-      const labelPath = orders.find((o) => o.id === orderToDelete)?.label_path;
+      const labelPath = orders.rows.find((o) => o.id === orderToDelete)?.label_path;
 
       const { error } = await supabase
         .from("outbound_orders")
@@ -390,7 +366,7 @@ export default function AdminOrders() {
       // Stock is returned by the order item delete triggers; drop the orphaned label
       if (labelPath) await removeLabel(labelPath);
       toast.success("Order deleted successfully");
-      setSelectedIds((prev) => prev.filter((id) => id !== orderToDelete));
+      setSelected((prev) => prev.filter((entry) => entry.id !== orderToDelete));
       fetchOrders();
     } catch (error: unknown) {
       const message =
@@ -587,9 +563,9 @@ export default function AdminOrders() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {categoryOptions.map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
+                    {categoryOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -601,10 +577,9 @@ export default function AdminOrders() {
           {/* Results Count + bulk label download */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
-              {filteredOrders.length} of {orders.length} orders match the filters
-              {selectedIds.length > 0 && ` · ${selectedIds.length} selected`}
+              {selected.length > 0 && `${selected.length} selected`}
             </div>
-            {selectedIds.length > 0 && (
+            {selected.length > 0 && (
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -614,12 +589,12 @@ export default function AdminOrders() {
                   <Download className="mr-2 h-4 w-4" />
                   {downloadingLabels
                     ? "Merging..."
-                    : `Download ${selectedIds.length} Labels (1 PDF)`}
+                    : `Download ${selected.length} Labels (1 PDF)`}
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setSelectedIds([])}
+                  onClick={() => setSelected([])}
                 >
                   Clear
                 </Button>
@@ -632,7 +607,7 @@ export default function AdminOrders() {
             <div className="flex items-center justify-center py-12">
               <Spinner label="Loading orders" />
             </div>
-          ) : filteredOrders.length === 0 ? (
+          ) : orders.rows.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No orders found
             </div>
@@ -640,7 +615,7 @@ export default function AdminOrders() {
             <>
               {/* Mobile: card list */}
               <div className="space-y-3 sm:hidden">
-                {pagedOrders.map((order) => (
+                {orders.rows.map((order) => (
                   <div
                     key={order.id}
                     className="rounded-lg border border-border bg-card p-3 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
@@ -651,8 +626,8 @@ export default function AdminOrders() {
                       {order.label_path && (
                         <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
                           <Checkbox
-                            checked={selectedIds.includes(order.id)}
-                            onCheckedChange={() => toggleSelected(order.id)}
+                            checked={isSelected(order.id)}
+                            onCheckedChange={() => toggleSelected(order)}
                             aria-label="Select order"
                           />
                         </div>
@@ -749,7 +724,7 @@ export default function AdminOrders() {
                           <Checkbox
                             checked={allSelected}
                             onCheckedChange={toggleSelectAll}
-                            disabled={selectableIds.length === 0}
+                            disabled={selectableOrders.length === 0}
                             aria-label="Select all orders with labels"
                           />
                         </th>
@@ -804,7 +779,7 @@ export default function AdminOrders() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pagedOrders.map((order) => (
+                      {orders.rows.map((order) => (
                         <tr
                           key={order.id}
                           className={cn(
@@ -819,8 +794,8 @@ export default function AdminOrders() {
                           >
                             {order.label_path && (
                               <Checkbox
-                                checked={selectedIds.includes(order.id)}
-                                onCheckedChange={() => toggleSelected(order.id)}
+                                checked={isSelected(order.id)}
+                                onCheckedChange={() => toggleSelected(order)}
                                 aria-label="Select order"
                               />
                             )}
@@ -943,9 +918,13 @@ export default function AdminOrders() {
                 </div>
               </div>
             <TablePagination
-              {...pagination}
+              page={orders.page}
+              pageCount={orders.pageCount}
+              from={orders.from}
+              to={orders.to}
+              total={orders.total}
+              onPageChange={orders.setPage}
               label="orders"
-              onPageChange={pagination.setPage}
             />
             </>
           )}

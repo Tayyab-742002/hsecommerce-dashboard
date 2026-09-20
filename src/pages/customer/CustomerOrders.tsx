@@ -26,7 +26,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import TablePagination from "@/components/TablePagination";
-import { usePagination } from "@/hooks/usePagination";
+import { usePagedQuery } from "@/hooks/usePagedQuery";
+import { useDebounced } from "@/hooks/useDebounced";
+import { dateFilterRange, likeTerm } from "@/lib/dateRange";
 
 interface Order {
   id: string;
@@ -55,9 +57,7 @@ interface Order {
 }
 
 export default function CustomerOrders() {
-  const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
@@ -66,104 +66,97 @@ export default function CustomerOrders() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerLoading, setCustomerLoading] = useState(true);
+  const [categories, setCategories] = useState<string[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const debouncedSearch = useDebounced(searchTerm);
 
   useEffect(() => {
-    fetchOrders();
+    resolveCustomer();
   }, []);
 
-  const fetchOrders = async () => {
+  const resolveCustomer = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setCustomerLoading(false);
+      return;
+    }
 
-    const { data: userRole, error: roleError } = await supabase
+    const { data: userRole } = await supabase
       .from("user_roles")
       .select("customer_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // If no role found or no customer_id, user cannot access customer orders
-    if (roleError || !userRole?.customer_id) {
-      setLoading(false);
-      return;
-    }
+    setCustomerId(userRole?.customer_id ?? null);
+    setCustomerLoading(false);
+  };
 
-    setCustomerId(userRole.customer_id);
+  // Folder list comes from its own query — the current page only holds 25 orders.
+  // RLS scopes the function to this customer's own orders.
+  const loadCategories = async () => {
+    const { data } = await supabase.rpc("order_category_options");
+    setCategories((data ?? []).map((row) => row.order_category));
+  };
 
-    const { data, error } = await supabase
-      .from("outbound_orders")
-      .select(
-        `
+  useEffect(() => {
+    if (customerId) loadCategories();
+  }, [customerId]);
+
+  const orders = usePagedQuery<Order>(
+    customerId
+      ? () => {
+          let query = supabase
+            .from("outbound_orders")
+            .select(
+              `
         *,
         warehouses (warehouse_name),
         outbound_order_items (order_item, quantity)
-      `
-      )
-      .eq("customer_id", userRole.customer_id)
-      .order("created_at", { ascending: false });
+      `,
+              { count: "exact" }
+            )
+            .eq("customer_id", customerId);
 
-    if (!error && data) {
-      setOrders(data as unknown as Order[]);
-    }
-    setLoading(false);
-  };
+          if (debouncedSearch.trim()) {
+            query = query.ilike("order_number", likeTerm(debouncedSearch));
+          }
 
-  // Helper function to filter by date
-  const filterByDate = (order: Order) => {
-    if (dateFilter === "all") return true;
-    
-    // Extract date parts from the order date string (format: YYYY-MM-DD)
-    const orderDateStr = order.requested_date.split('T')[0]; // Get just the date part
-    const [orderYear, orderMonth, orderDay] = orderDateStr.split('-').map(Number);
-    
-    // Create date objects at midnight local time
-    const orderDate = new Date(orderYear, orderMonth - 1, orderDay);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    switch (dateFilter) {
-      case "today":
-        const todayYear = today.getFullYear();
-        const todayMonth = today.getMonth();
-        const todayDay = today.getDate();
-        return orderYear === todayYear && orderMonth - 1 === todayMonth && orderDay === todayDay;
-      case "week":
-        const weekAgo = new Date(today);
-        weekAgo.setDate(today.getDate() - 7);
-        return orderDate >= weekAgo && orderDate <= today;
-      case "month":
-        const monthAgo = new Date(today);
-        monthAgo.setDate(today.getDate() - 30); // Last 30 days
-        return orderDate >= monthAgo && orderDate <= today;
-      default:
-        return true;
-    }
-  };
+          const range = dateFilterRange(dateFilter);
+          if (range) {
+            query = query
+              .gte("requested_date", range.from)
+              .lte("requested_date", range.to);
+          }
 
-  const filteredOrders = orders.filter((order) => {
-    // Search filter
-    const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Date filter
-    const matchesDate = filterByDate(order);
-    
-    // Status filter
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    
-    // Order type filter
-    const matchesOrderType = orderTypeFilter === "all" || order.order_type === orderTypeFilter;
+          if (statusFilter !== "all") query = query.eq("status", statusFilter);
+          if (orderTypeFilter !== "all") {
+            query = query.eq("order_type", orderTypeFilter);
+          }
+          if (categoryFilter === "none") {
+            query = query.is("order_category", null);
+          } else if (categoryFilter !== "all") {
+            query = query.eq("order_category", categoryFilter);
+          }
 
-    // Category filter ("none" = orders not filed in any folder)
-    const matchesCategory =
-      categoryFilter === "all" ||
-      (categoryFilter === "none"
-        ? !order.order_category
-        : order.order_category === categoryFilter);
+          return query
+            .order("created_at", { ascending: false })
+            .returns<Order[]>();
+        }
+      : null,
+    [
+      customerId,
+      debouncedSearch,
+      dateFilter,
+      statusFilter,
+      orderTypeFilter,
+      categoryFilter,
+    ]
+  );
 
-    return matchesSearch && matchesDate && matchesStatus && matchesOrderType && matchesCategory;
-  });
+  const loading = customerLoading || orders.loading;
 
   const clearFilters = () => {
     setDateFilter("all");
@@ -177,10 +170,6 @@ export default function CustomerOrders() {
     statusFilter !== "all" ||
     orderTypeFilter !== "all" ||
     categoryFilter !== "all";
-
-  const categories = [
-    ...new Set(orders.map((o) => o.order_category).filter(Boolean) as string[]),
-  ].sort();
 
   const handleLabelDownload = async (order: Order, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -199,7 +188,6 @@ export default function CustomerOrders() {
     setDetailsDialogOpen(true);
   };
 
-  const { pageItems: pagedOrders, ...pagination } = usePagination(filteredOrders);
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -226,7 +214,8 @@ export default function CustomerOrders() {
                 customerId={customerId}
                 onComplete={() => {
                   setCreateDialogOpen(false);
-                  fetchOrders();
+                  orders.refetch();
+                  loadCategories();
                 }}
               />
             )}
@@ -341,9 +330,7 @@ export default function CustomerOrders() {
               </div>
             )}
 
-            <div className="text-sm text-muted-foreground">
-              {filteredOrders.length} of {orders.length} orders match the filters
-            </div>
+
           </div>
         </CardHeader>
         <CardContent>
@@ -351,7 +338,7 @@ export default function CustomerOrders() {
             <div className="flex items-center justify-center py-12">
               <Spinner label="Loading orders" />
             </div>
-          ) : filteredOrders.length === 0 ? (
+          ) : orders.rows.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No orders found
             </div>
@@ -359,7 +346,7 @@ export default function CustomerOrders() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
-                {pagedOrders.map((order) => (
+                {orders.rows.map((order) => (
                   <div
                     key={order.id}
                     className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
@@ -457,7 +444,7 @@ export default function CustomerOrders() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pagedOrders.map((order) => (
+                      {orders.rows.map((order) => (
                         <tr
                           key={order.id}
                           className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -542,9 +529,13 @@ export default function CustomerOrders() {
                 </div>
               </div>
             <TablePagination
-              {...pagination}
+              page={orders.page}
+              pageCount={orders.pageCount}
+              from={orders.from}
+              to={orders.to}
+              total={orders.total}
+              onPageChange={orders.setPage}
               label="orders"
-              onPageChange={pagination.setPage}
             />
             </>
           )}

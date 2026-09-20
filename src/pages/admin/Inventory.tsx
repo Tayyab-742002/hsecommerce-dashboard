@@ -27,7 +27,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import TablePagination from "@/components/TablePagination";
-import { usePagination } from "@/hooks/usePagination";
+import { usePagedQuery } from "@/hooks/usePagedQuery";
+import { useDebounced } from "@/hooks/useDebounced";
+import { useCustomerMatches } from "@/hooks/useCustomerMatches";
+import { dateFilterRange, likeTerm } from "@/lib/dateRange";
 
 interface InventoryItem {
   id: string;
@@ -62,9 +65,7 @@ interface InventoryItem {
 }
 
 export default function AdminInventory() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -76,98 +77,71 @@ export default function AdminInventory() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const debouncedSearch = useDebounced(searchTerm);
+  const customerMatches = useCustomerMatches(debouncedSearch);
 
-  const fetchInventory = useCallback(async () => {
-    try {
-      const customerId = searchParams.get("customer");
-      let query = supabase.from("inventory_items").select(`
+  const customerParam = searchParams.get("customer");
+
+  const items = usePagedQuery<InventoryItem>(
+    () => {
+      let query = supabase.from("inventory_items").select(
+        `
           *,
           customers (company_name, contact_person),
           warehouses (warehouse_name),
           pallets (pallet_number)
-        `);
+        `,
+        { count: "exact" }
+      );
 
-      if (customerId) {
-        query = query.eq("customer_id", customerId);
+      if (customerParam) query = query.eq("customer_id", customerParam);
+
+      const term = debouncedSearch.trim();
+      if (term) {
+        const clauses = [
+          `item_code.ilike.${likeTerm(term)}`,
+          `item_name.ilike.${likeTerm(term)}`,
+        ];
+        if (customerMatches?.length) {
+          clauses.push(`customer_id.in.(${customerMatches.join(",")})`);
+        }
+        query = query.or(clauses.join(","));
       }
 
-      const { data, error } = await query.order("created_at", {
-        ascending: false,
-      });
+      const range = dateFilterRange(dateFilter);
+      if (range) {
+        query = query
+          .gte("received_date", range.from)
+          .lte("received_date", range.to);
+      }
 
-      if (error) throw error;
-      setItems(data || []);
-    } catch (error) {
-      console.error("Error fetching inventory:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchParams]);
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (categoryFilter !== "all") query = query.eq("category", categoryFilter);
 
-  useEffect(() => {
-    fetchInventory();
-  }, [fetchInventory]);
-
-  // Helper function to filter by date
-  const filterByDate = (item: InventoryItem) => {
-    if (dateFilter === "all") return true;
-    
-    // Extract date parts from the item date string (format: YYYY-MM-DD)
-    const itemDateStr = item.received_date.split('T')[0]; // Get just the date part
-    const [itemYear, itemMonth, itemDay] = itemDateStr.split('-').map(Number);
-    
-    // Create date objects at midnight local time
-    const itemDate = new Date(itemYear, itemMonth - 1, itemDay);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    switch (dateFilter) {
-      case "today":
-        const todayYear = today.getFullYear();
-        const todayMonth = today.getMonth();
-        const todayDay = today.getDate();
-        return itemYear === todayYear && itemMonth - 1 === todayMonth && itemDay === todayDay;
-      case "week":
-        const weekAgo = new Date(today);
-        weekAgo.setDate(today.getDate() - 7);
-        return itemDate >= weekAgo && itemDate <= today;
-      case "month":
-        const monthAgo = new Date(today);
-        monthAgo.setDate(today.getDate() - 30); // Last 30 days
-        return itemDate >= monthAgo && itemDate <= today;
-      default:
-        return true;
-    }
-  };
-
-  const filteredItems = items.filter((item) => {
-    // Search filter
-    const matchesSearch =
-      item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.customers?.company_name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
-    
-    // Date filter
-    const matchesDate = filterByDate(item);
-    
-    // Status filter
-    const matchesStatus =
-      statusFilter === "all" || item.status === statusFilter;
-    
-    // Category filter
-    const matchesCategory =
-      categoryFilter === "all" || 
-      item.category?.toLowerCase() === categoryFilter.toLowerCase();
-    
-    return matchesSearch && matchesDate && matchesStatus && matchesCategory;
-  });
-
-  // Get unique categories for filter
-  const categories = Array.from(
-    new Set(items.map((item) => item.category).filter(Boolean))
+      return query
+        .order("created_at", { ascending: false })
+        .returns<InventoryItem[]>();
+    },
+    [
+      customerParam,
+      debouncedSearch,
+      customerMatches,
+      dateFilter,
+      statusFilter,
+      categoryFilter,
+    ]
   );
+
+  const loading = items.loading;
+  const fetchInventory = items.refetch;
+
+  // Category options need their own query — a page holds only 25 items
+  useEffect(() => {
+    supabase
+      .rpc("inventory_category_options")
+      .then(({ data }) => setCategories((data ?? []).map((row) => row.category)));
+  }, []);
 
   // Clear all filters
   const clearFilters = () => {
@@ -216,7 +190,6 @@ export default function AdminInventory() {
       setItemToDelete(null);
     }
   };
-  const { pageItems: pagedItems, ...pagination } = usePagination(filteredItems);
 
   return (
     <div className="space-y-6">
@@ -337,7 +310,7 @@ export default function AdminInventory() {
           
           {/* Results Count */}
           <div className="text-sm text-muted-foreground">
-            {filteredItems.length} of {items.length} items match the filters
+
           </div>
         </CardHeader>
         <CardContent>
@@ -348,12 +321,12 @@ export default function AdminInventory() {
                 <div className="flex items-center justify-center py-12">
                   <Spinner label="Loading inventory" />
                 </div>
-              ) : filteredItems.length === 0 ? (
+              ) : items.rows.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No items found
                 </div>
               ) : (
-                pagedItems.map((item) => (
+                items.rows.map((item) => (
                   <div
                     key={item.id}
                     className="rounded-lg border border-border bg-card p-3 shadow-sm"
@@ -488,7 +461,7 @@ export default function AdminInventory() {
                           Loading inventory...
                         </td>
                       </tr>
-                    ) : filteredItems.length === 0 ? (
+                    ) : items.rows.length === 0 ? (
                       <tr>
                         <td
                           colSpan={9}
@@ -498,7 +471,7 @@ export default function AdminInventory() {
                         </td>
                       </tr>
                     ) : (
-                      pagedItems.map((item) => (
+                      items.rows.map((item) => (
                         <tr
                           key={item.id}
                           className="border-b border-border/60 last:border-b-0"
@@ -563,9 +536,13 @@ export default function AdminInventory() {
               </div>
             </div>
           <TablePagination
-            {...pagination}
+            page={items.page}
+            pageCount={items.pageCount}
+            from={items.from}
+            to={items.to}
+            total={items.total}
+            onPageChange={items.setPage}
             label="items"
-            onPageChange={pagination.setPage}
           />
           </>
         </CardContent>

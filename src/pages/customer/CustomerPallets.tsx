@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import TablePagination from "@/components/TablePagination";
-import { usePagination } from "@/hooks/usePagination";
+import { usePagedQuery } from "@/hooks/usePagedQuery";
+import { useDebounced } from "@/hooks/useDebounced";
+import { likeTerm } from "@/lib/dateRange";
 
 interface Pallet {
   id: string;
@@ -38,8 +40,6 @@ interface Pallet {
 
 export default function CustomerPallets() {
   const { userRole } = useAuth();
-  const [pallets, setPallets] = useState<Pallet[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
@@ -47,15 +47,16 @@ export default function CustomerPallets() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedPalletId, setSelectedPalletId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (userRole?.customer_id) fetchPallets(userRole.customer_id);
-  }, [userRole]);
+  const debouncedSearch = useDebounced(searchTerm);
+  const customerId = userRole?.customer_id ?? null;
 
-  const fetchPallets = async (customerId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("pallets")
-        .select(`
+  const pallets = usePagedQuery<Pallet>(
+    customerId
+      ? () => {
+          let query = supabase
+            .from("pallets")
+            .select(
+              `
           id,
           pallet_number,
           container_number,
@@ -67,26 +68,32 @@ export default function CustomerPallets() {
             quantity,
             inventory_items (item_name, sku, item_code)
           )
-        `)
-        .eq("customer_id", customerId)
-        .order("received_date", { ascending: false });
+        `,
+              { count: "exact" }
+            )
+            .eq("customer_id", customerId);
 
-      if (error) throw error;
-      setPallets((data as unknown as Pallet[]) || []);
-    } catch (error) {
-      console.error("Error fetching pallets:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+          const term = debouncedSearch.trim();
+          if (term) {
+            query = query.or(
+              [
+                `pallet_number.ilike.${likeTerm(term)}`,
+                `container_number.ilike.${likeTerm(term)}`,
+              ].join(",")
+            );
+          }
 
-  const filteredPallets = pallets.filter((p) => {
-    const matchesSearch =
-      p.pallet_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.container_number || "").toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+          if (statusFilter !== "all") query = query.eq("status", statusFilter);
+
+          return query
+            .order("received_date", { ascending: false })
+            .returns<Pallet[]>();
+        }
+      : null,
+    [customerId, debouncedSearch, statusFilter]
+  );
+
+  const loading = pallets.loading;
 
   const hasActiveFilters = statusFilter !== "all" || searchTerm !== "";
 
@@ -109,10 +116,42 @@ export default function CustomerPallets() {
     return remaining > 0 ? `${preview} +${remaining} more` : preview;
   };
 
-  const inStorage = pallets.filter((p) => p.status === "in_storage").length;
-  const partiallyPicked = pallets.filter((p) => p.status === "partially_picked").length;
+  // KPI counts cover every pallet, not the page on screen, so they come from
+  // count-only queries rather than the fetched rows
+  const [counts, setCounts] = useState({
+    total: 0,
+    inStorage: 0,
+    partiallyPicked: 0,
+  });
 
-  const { pageItems: pagedPallets, ...pagination } = usePagination(filteredPallets);
+  useEffect(() => {
+    if (!customerId) return;
+
+    const countPallets = (status?: string) => {
+      let query = supabase
+        .from("pallets")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", customerId);
+      if (status) query = query.eq("status", status);
+      return query;
+    };
+
+    Promise.all([
+      countPallets(),
+      countPallets("in_storage"),
+      countPallets("partially_picked"),
+    ]).then(([all, inStorage, partiallyPicked]) =>
+      setCounts({
+        total: all.count ?? 0,
+        inStorage: inStorage.count ?? 0,
+        partiallyPicked: partiallyPicked.count ?? 0,
+      })
+    );
+  }, [customerId, pallets.total]);
+
+  const inStorage = counts.inStorage;
+  const partiallyPicked = counts.partiallyPicked;
+
 
   return (
     <div className="space-y-6">
@@ -124,11 +163,11 @@ export default function CustomerPallets() {
       </div>
 
       {/* Summary KPIs */}
-      {!loading && pallets.length > 0 && (
+      {!loading && counts.total > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg border border-border bg-card px-4 py-3">
             <p className="text-xs text-muted-foreground">Total Pallets</p>
-            <p className="text-2xl font-bold">{pallets.length}</p>
+            <p className="text-2xl font-bold">{counts.total}</p>
           </div>
           <div className="rounded-lg border border-border bg-card px-4 py-3">
             <p className="text-xs text-muted-foreground">In Storage</p>
@@ -141,7 +180,7 @@ export default function CustomerPallets() {
           <div className="rounded-lg border border-border bg-card px-4 py-3">
             <p className="text-xs text-muted-foreground">Empty / Other</p>
             <p className="text-2xl font-bold text-muted-foreground">
-              {pallets.length - inStorage - partiallyPicked}
+              {counts.total - inStorage - partiallyPicked}
             </p>
           </div>
         </div>
@@ -210,7 +249,6 @@ export default function CustomerPallets() {
           )}
 
           <div className="text-sm text-muted-foreground">
-            {filteredPallets.length} of {pallets.length} pallets match the filters
           </div>
         </CardHeader>
 
@@ -221,12 +259,12 @@ export default function CustomerPallets() {
               <div className="flex items-center justify-center py-12">
                 <Spinner label="Loading pallets" />
               </div>
-            ) : filteredPallets.length === 0 ? (
+            ) : pallets.rows.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No pallets found
               </div>
             ) : (
-              pagedPallets.map((pallet) => (
+              pallets.rows.map((pallet) => (
                 <div
                   key={pallet.id}
                   className="rounded-lg border border-border bg-card p-3 shadow-sm"
@@ -284,14 +322,14 @@ export default function CustomerPallets() {
                         Loading pallets...
                       </td>
                     </tr>
-                  ) : filteredPallets.length === 0 ? (
+                  ) : pallets.rows.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
                         No pallets found
                       </td>
                     </tr>
                   ) : (
-                    pagedPallets.map((pallet) => (
+                    pallets.rows.map((pallet) => (
                       <tr
                         key={pallet.id}
                         className="border-b border-border/60 last:border-b-0"
@@ -334,10 +372,14 @@ export default function CustomerPallets() {
             </div>
           </div>
         <TablePagination
-          {...pagination}
-          label="pallets"
-          onPageChange={pagination.setPage}
-        />
+            page={pallets.page}
+            pageCount={pallets.pageCount}
+            from={pallets.from}
+            to={pallets.to}
+            total={pallets.total}
+            onPageChange={pallets.setPage}
+            label="pallets"
+          />
         </CardContent>
       </Card>
 
