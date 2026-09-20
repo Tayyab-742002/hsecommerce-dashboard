@@ -609,6 +609,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_customer_order_stats: {
+        Args: Record<string, never>
+        Returns: {
+          customer_id: string
+          customer_code: string
+          customer_name: string
+          contact_person: string
+          total_orders: number
+          unread_orders: number
+          pending_orders: number
+          last_order_at: string | null
+        }[]
+      }
+      customer_order_category_stats: {
+        Args: { p_customer_id: string }
+        Returns: {
+          order_category: string
+          order_count: number
+          unread_count: number
+          label_count: number
+        }[]
+      }
       customer_billing_summary: {
         Args: { p_customer_id: string }
         Returns: {

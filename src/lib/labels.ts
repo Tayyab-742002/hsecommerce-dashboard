@@ -66,6 +66,32 @@ export async function downloadMergedLabels(paths: string[], filename: string) {
   saveAs(new Blob([merged], { type: "application/pdf" }), filename);
 }
 
+/**
+ * Downloads several labels as one ZIP, each file keeping its own format and
+ * named after its order. fflate is imported lazily, like pdf-lib.
+ */
+export async function downloadLabelsZip(
+  labels: { path: string; name: string }[],
+  filename: string
+) {
+  const { zipSync } = await import("fflate");
+
+  const files: Record<string, Uint8Array> = {};
+  for (const label of labels) {
+    const ext = label.path.split(".").pop()?.toLowerCase() ?? "pdf";
+    const safeName = label.name.replace(/[^\w.-]/g, "_");
+
+    // Two orders can share a number in theory; don't let one overwrite the other
+    let entry = `${safeName}.${ext}`;
+    let suffix = 2;
+    while (files[entry]) entry = `${safeName}-${suffix++}.${ext}`;
+
+    files[entry] = await fetchLabel(label.path);
+  }
+
+  saveAs(new Blob([zipSync(files)], { type: "application/zip" }), filename);
+}
+
 /** Short-lived viewable URL, for previewing a label in a new tab. */
 export async function labelPreviewUrl(path: string) {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 300);
