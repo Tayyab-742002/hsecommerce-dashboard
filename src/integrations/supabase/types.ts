@@ -609,6 +609,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      customer_billing_summary: {
+        Args: { p_customer_id: string }
+        Returns: {
+          total_charges: number
+          monthly_charges: number
+          total_orders: number
+        }[]
+      }
+      inventory_category_options: {
+        Args: Record<string, never>
+        Returns: { category: string }[]
+      }
+      order_category_options: {
+        Args: Record<string, never>
+        Returns: {
+          customer_id: string
+          customer_name: string
+          order_category: string
+        }[]
+      }
       get_user_customer_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
