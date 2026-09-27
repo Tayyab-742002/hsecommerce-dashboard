@@ -179,7 +179,7 @@ function OrderRow({
           {order.total_items} items · {order.total_quantity} units ·{" "}
           {(order.total_charges ?? 0) === 0 ? (
             // Prompt the admin: an unpriced order would invoice at £0
-            <span className="font-medium text-amber-600">Not priced</span>
+            <span className="font-semibold text-destructive">Not priced</span>
           ) : (
             formatCurrency(order.total_charges)
           )}
