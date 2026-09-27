@@ -105,6 +105,12 @@ export default function InvoiceDialog({
   const [payOpen, setPayOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
+  const [bank, setBank] = useState<{
+    account_name: string | null;
+    account_number: string | null;
+    sort_code: string | null;
+    bank_name: string | null;
+  } | null>(null);
   const [payment, setPayment] = useState({
     date: new Date().toISOString().split("T")[0],
     method: "Bank transfer",
@@ -149,6 +155,16 @@ export default function InvoiceDialog({
     if (open && invoiceId) load();
     else if (!open) setInvoice(null);
   }, [open, invoiceId]);
+
+  useEffect(() => {
+    if (!open) return;
+    supabase
+      .from("company_settings")
+      .select("account_name, account_number, sort_code, bank_name")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => setBank(data ?? null));
+  }, [open]);
 
   const subtotal = lines.reduce((sum, line) => sum + lineTotal(line), 0);
   const vatRate = invoice ? Number(invoice.vat_rate) : 0;
@@ -518,6 +534,32 @@ export default function InvoiceDialog({
                     <span>Paid</span>
                     <span>-{formatCurrency(invoice.amount_paid)}</span>
                   </div>
+                )}
+              </div>
+
+              {/* Payment details, exactly as they print on the PDF */}
+              <div className="rounded-[var(--radius-lg)] border border-border bg-muted/40 p-3">
+                <p className="mb-2 text-sm font-semibold">Bank Details</p>
+                {bank?.account_number ? (
+                  <dl className="grid grid-cols-[130px_1fr] gap-y-1 text-sm">
+                    {[
+                      ["Account Name", bank.account_name],
+                      ["Account Number", bank.account_number],
+                      ["Sort Code", bank.sort_code],
+                      ["Bank", bank.bank_name],
+                      ["Reference", invoice.invoice_number ?? "Set on issue"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="contents">
+                        <dt className="font-medium">{label}</dt>
+                        <dd className="text-muted-foreground">{value || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No bank details yet — add them in Settings and they'll print
+                    on every invoice.
+                  </p>
                 )}
               </div>
 

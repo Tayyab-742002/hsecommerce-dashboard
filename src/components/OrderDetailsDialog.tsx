@@ -35,7 +35,10 @@ import {
   Download,
   ExternalLink,
   Upload,
+  Pencil,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   LABEL_ACCEPT,
   downloadLabel,
@@ -159,6 +162,7 @@ interface OrderDetails {
     warehouse_code: string;
   };
   outbound_order_items: Array<{
+    id: string;
     order_item: string;
     quantity: number;
     unit_price: number | null;
@@ -178,6 +182,84 @@ export default function OrderDetailsDialog({
   const [loading, setLoading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const [pricing, setPricing] = useState(false);
+  const [savingCharges, setSavingCharges] = useState(false);
+  const [rate, setRate] = useState(0);
+  const [delivery, setDelivery] = useState(0);
+  const [prices, setPrices] = useState<Record<string, number>>({});
+
+  /**
+   * Customer-created orders arrive unpriced — the customer never sees rates.
+   * This is where an admin puts a price on the work before invoicing it.
+   */
+  const startPricing = () => {
+    if (!orderDetails) return;
+    const quantity = orderDetails.total_quantity || 1;
+    setRate(Number(((orderDetails.handling_charges ?? 0) / quantity).toFixed(4)));
+    setDelivery(orderDetails.delivery_charges ?? 0);
+    setPrices(
+      Object.fromEntries(
+        orderDetails.outbound_order_items.map((item) => [
+          item.id,
+          item.unit_price ?? 0,
+        ])
+      )
+    );
+    setPricing(true);
+  };
+
+  const itemsSubtotal = orderDetails
+    ? orderDetails.outbound_order_items.reduce(
+        (sum, item) =>
+          sum +
+          item.quantity *
+            (pricing ? prices[item.id] ?? 0 : item.unit_price ?? 0),
+        0
+      )
+    : 0;
+
+  const handling = rate * (orderDetails?.total_quantity ?? 0);
+  const pricedTotal = itemsSubtotal + handling + delivery;
+
+  const saveCharges = async () => {
+    if (!orderDetails) return;
+    setSavingCharges(true);
+
+    try {
+      // Unit price is not a quantity, so none of the stock triggers fire here
+      for (const item of orderDetails.outbound_order_items) {
+        const next = prices[item.id] ?? 0;
+        if (next === (item.unit_price ?? 0)) continue;
+
+        const { error } = await supabase
+          .from("outbound_order_items")
+          .update({ unit_price: next })
+          .eq("id", item.id);
+        if (error) throw new Error(error.message);
+      }
+
+      const { error } = await supabase
+        .from("outbound_orders")
+        .update({
+          handling_charges: handling,
+          delivery_charges: delivery,
+          total_charges: pricedTotal,
+        })
+        .eq("id", orderDetails.id);
+      if (error) throw new Error(error.message);
+
+      toast.success("Charges saved");
+      setPricing(false);
+      fetchOrderDetails();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save charges"
+      );
+    } finally {
+      setSavingCharges(false);
+    }
+  };
 
   const labelInputRef = useRef<HTMLInputElement>(null);
   const [replacingLabel, setReplacingLabel] = useState(false);
@@ -277,13 +359,13 @@ export default function OrderDetailsDialog({
         ? `
           *,
           warehouses (warehouse_name, warehouse_code),
-          outbound_order_items (order_item, quantity, unit_price, inventory_item_id),
+          outbound_order_items (id, order_item, quantity, unit_price, inventory_item_id),
           customers (company_name, contact_person, email, phone)
         `
         : `
           *,
           warehouses (warehouse_name, warehouse_code),
-          outbound_order_items (order_item, quantity, unit_price, inventory_item_id)
+          outbound_order_items (id, order_item, quantity, unit_price, inventory_item_id)
         `;
 
       const { data, error } = await supabase
@@ -516,61 +598,185 @@ export default function OrderDetailsDialog({
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={pricing ? "md:col-span-2" : ""}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />
-                    Charges
+                  <CardTitle className="text-lg flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Charges
+                    </span>
+                    {showCustomerInfo && !pricing && (
+                      <Button size="sm" variant="outline" onClick={startPricing}>
+                        <Pencil className="mr-2 h-3.5 w-3.5" />
+                        {(orderDetails.total_charges ?? 0) === 0
+                          ? "Set charges"
+                          : "Edit charges"}
+                      </Button>
+                    )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {orderDetails.outbound_order_items?.some(
-                    (item) => (item.unit_price ?? 0) !== 0
-                  ) && (
-                    <div className="flex justify-between items-center">
+
+                {pricing ? (
+                  <CardContent className="space-y-4">
+                    {/* Per-item prices */}
+                    <div className="space-y-2">
+                      {orderDetails.outbound_order_items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_70px_110px_90px]"
+                        >
+                          <span className="truncate text-sm">
+                            {item.order_item}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            × {item.quantity}
+                          </span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={prices[item.id] ?? 0}
+                            onChange={(event) =>
+                              setPrices((prev) => ({
+                                ...prev,
+                                [item.id]: Number(event.target.value),
+                              }))
+                            }
+                          />
+                          <span className="text-right text-sm font-medium">
+                            {formatCurrency(
+                              item.quantity * (prices[item.id] ?? 0)
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Separator />
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Pick &amp; pack rate per unit</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={rate}
+                          onChange={(event) =>
+                            setRate(Number(event.target.value))
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          × {orderDetails.total_quantity} units ={" "}
+                          {formatCurrency(handling)}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Delivery charge</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={delivery}
+                          onChange={(event) =>
+                            setDelivery(Number(event.target.value))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Items subtotal
+                        </span>
+                        <span>{formatCurrency(itemsSubtotal)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Handling</span>
+                        <span>{formatCurrency(handling)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Delivery</span>
+                        <span>{formatCurrency(delivery)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1 text-base font-bold">
+                        <span>Total charges</span>
+                        <span>{formatCurrency(pricedTotal)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button disabled={savingCharges} onClick={saveCharges}>
+                        {savingCharges ? "Saving..." : "Save charges"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={savingCharges}
+                        onClick={() => setPricing(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                ) : (
+                  <CardContent className="space-y-3">
+                    {(orderDetails.total_charges ?? 0) === 0 &&
+                      orderDetails.status === "pending" && (
+                        <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-500">
+                          {showCustomerInfo
+                            ? "Not priced yet — set the charges before invoicing."
+                            : "Awaiting pricing by H&S E-commerce."}
+                        </p>
+                      )}
+
+                    {itemsSubtotal !== 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Items Subtotal:
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(itemsSubtotal)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">
-                        Items Subtotal:
+                        Handling Charges:
                       </span>
                       <span className="font-medium">
-                        {formatCurrency(
-                          orderDetails.outbound_order_items.reduce(
-                            (sum, item) =>
-                              sum + item.quantity * (item.unit_price ?? 0),
-                            0
-                          )
-                        )}
+                        {formatCurrency(orderDetails.handling_charges ?? 0)}
                       </span>
                     </div>
-                  )}
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">
-                      Handling Charges:
-                    </span>
-                    <span className="font-medium">
-                      {formatCurrency(
-                        orderDetails.handling_charges /
-                          orderDetails.total_quantity || 0
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">
-                      Total Quantity:
-                    </span>
-                    <span className="font-medium">
-                      {orderDetails.total_quantity ?? 0}
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold">
-                      Total Charges:
-                    </span>
-                    <span className="text-lg font-bold">
-                      {formatCurrency(orderDetails.total_charges ?? 0)}
-                    </span>
-                  </div>
-                </CardContent>
+                    {(orderDetails.delivery_charges ?? 0) !== 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Delivery:
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(orderDetails.delivery_charges ?? 0)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Total Quantity:
+                      </span>
+                      <span className="font-medium">
+                        {orderDetails.total_quantity ?? 0}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">
+                        Total Charges:
+                      </span>
+                      <span className="text-lg font-bold">
+                        {formatCurrency(orderDetails.total_charges ?? 0)}
+                      </span>
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             </div>
 
