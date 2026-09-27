@@ -137,13 +137,20 @@ export default function AdminCustomers() {
         .eq("id", customerToDelete);
 
       if (error) throw error;
-      toast.success("Customer deleted successfully");
+      toast.success("Customer, their login and all their data deleted");
       fetchCustomers();
     } catch (error: unknown) {
-      const message =
+      const raw =
         typeof error === "object" && error !== null && "message" in error
           ? String((error as { message: unknown }).message)
           : "Failed to delete customer";
+
+      // invoices.customer_id is ON DELETE RESTRICT so financial records outlive
+      // a customer; the raw foreign key error explains none of that
+      const message = raw.includes("invoices")
+        ? "This customer has invoices, which are kept as financial records. Void and delete their invoices first, or set the customer to inactive instead."
+        : raw;
+
       toast.error(message);
     } finally {
       setDeleteDialogOpen(false);
@@ -451,8 +458,9 @@ export default function AdminCustomers() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this customer and all associated
-              data. This action cannot be undone.
+              This permanently deletes the customer, their portal login, and
+              all of their inventory, pallets and orders. Their email address
+              becomes free to use again. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
