@@ -18,9 +18,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { createOrder } from "@/lib/createOrder";
+import { LABEL_ACCEPT, removeLabel, uploadLabel } from "@/lib/labels";
+
+export interface OrderWizardInitial {
+  warehouse_id: string;
+  order_type: string;
+  order_category: string | null;
+  items: { inventory_item_id: string; quantity: number; unit_price: number }[];
+}
 
 interface OrderWizardProps {
   onComplete: () => void;
+  /** When set the wizard runs in customer mode: no customer picker, no pricing fields. */
+  customerId?: string;
+  /** Prefills the wizard from a past order (reorder). The label is never reused. */
+  initialOrder?: OrderWizardInitial;
 }
 
 interface OrderItem {
@@ -32,9 +44,17 @@ interface OrderItem {
   pallet_id?: string | null;
 }
 
-export default function OrderWizard({ onComplete }: OrderWizardProps) {
+export default function OrderWizard({
+  onComplete,
+  customerId,
+  initialOrder,
+}: OrderWizardProps) {
   const { toast } = useToast();
+  const customerMode = !!customerId;
   const [step, setStep] = useState("1");
+  const [submitting, setSubmitting] = useState(false);
+  const [labelFile, setLabelFile] = useState<File | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
@@ -45,24 +65,33 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
     order_type: string;
     requested_date: string;
     special_instructions: string;
+    order_category: string;
     pick_and_pack_rate?: number;
     delivery_charges: number;
   }>({
-    customer_id: "",
-    warehouse_id: "",
-    order_type: "delivery",
+    customer_id: customerId ?? "",
+    warehouse_id: initialOrder?.warehouse_id ?? "",
+    order_type: initialOrder?.order_type ?? "delivery",
     requested_date: new Date().toISOString().split("T")[0],
     special_instructions: "",
+    order_category: initialOrder?.order_category ?? "",
     pick_and_pack_rate: 0,
     delivery_charges: 0,
   });
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryContainerRef = useRef<HTMLDivElement>(null);
+
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const customerInputRef = useRef<HTMLInputElement>(null);
   const customerContainerRef = useRef<HTMLDivElement>(null);
+
+  const matchingCategories = categories.filter((category) =>
+    category.toLowerCase().includes(orderData.order_category.trim().toLowerCase())
+  );
 
   const filteredCustomers = customers.filter((c) => {
     const q = customerSearch.toLowerCase();
@@ -74,9 +103,27 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
   });
 
   useEffect(() => {
-    fetchCustomers();
+    if (!customerMode) fetchCustomers();
     fetchWarehouses();
-  }, []);
+  }, [customerMode]);
+
+  // Existing folders for this customer, for the category autocomplete
+  useEffect(() => {
+    if (!orderData.customer_id) {
+      setCategories([]);
+      return;
+    }
+    supabase
+      .from("outbound_orders")
+      .select("order_category")
+      .eq("customer_id", orderData.customer_id)
+      .not("order_category", "is", null)
+      .then(({ data }) =>
+        setCategories([
+          ...new Set((data ?? []).map((row) => row.order_category as string)),
+        ].sort())
+      );
+  }, [orderData.customer_id]);
 
   useEffect(() => {
     if (orderData.customer_id && orderData.warehouse_id) {
@@ -110,6 +157,41 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       .gt("quantity", 0);
     setInventory(data || []);
   };
+
+  // Reorder: the copied lines only carry ids, so they are filled in once the
+  // inventory for this customer and warehouse has loaded. Anything no longer in
+  // stock is dropped rather than silently ordered at zero.
+  const prefilled = useRef(false);
+
+  useEffect(() => {
+    if (!initialOrder || prefilled.current || inventory.length === 0) return;
+
+    const rows = initialOrder.items
+      .map((item) => {
+        const inv = inventory.find((i) => i.id === item.inventory_item_id);
+        if (!inv) return null;
+        return {
+          inventory_item_id: inv.id,
+          quantity: Math.min(item.quantity, inv.quantity),
+          unit_price: item.unit_price,
+          item_name: inv.item_name,
+          available_quantity: inv.quantity,
+          pallet_id: inv.pallet_id ?? null,
+        };
+      })
+      .filter(Boolean) as OrderItem[];
+
+    prefilled.current = true;
+    setOrderItems(rows);
+
+    const dropped = initialOrder.items.length - rows.length;
+    if (dropped > 0) {
+      toast({
+        title: "Some items are unavailable",
+        description: `${dropped} item(s) from the original order are out of stock and were not added`,
+      });
+    }
+  }, [initialOrder, inventory, toast]);
 
   const addOrderItem = () => {
     setOrderItems([
@@ -210,18 +292,33 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       }
     }
 
+    if (!labelFile) {
+      toast({
+        title: "Error",
+        description: "Please attach the shipping label for this order",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    let labelPath: string | null = null;
     try {
+      labelPath = await uploadLabel(orderData.customer_id, labelFile);
+
       const orderNumber = await createOrder({
         customer_id: orderData.customer_id,
         warehouse_id: orderData.warehouse_id,
         order_type: orderData.order_type,
         requested_date: orderData.requested_date,
         special_instructions: orderData.special_instructions || null,
-        pick_and_pack_rate: orderData.pick_and_pack_rate ?? 0,
+        order_category: orderData.order_category,
+        label_path: labelPath,
+        pick_and_pack_rate: customerMode ? 0 : orderData.pick_and_pack_rate ?? 0,
         items: orderItems.map((item) => ({
           inventory_item_id: item.inventory_item_id,
           quantity: item.quantity ?? 1,
-          unit_price: item.unit_price ?? 0,
+          unit_price: customerMode ? 0 : item.unit_price ?? 0,
           item_name: item.item_name,
           pallet_id: item.pallet_id,
         })),
@@ -233,12 +330,16 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
       });
       onComplete();
     } catch (error) {
+      // Don't leave the uploaded label orphaned if the order itself failed
+      if (labelPath) await removeLabel(labelPath);
       toast({
         title: "Error",
         description:
           error instanceof Error ? error.message : "Failed to create order",
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -275,6 +376,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
 
       <TabsContent value="1" className="space-y-4 mt-4">
         <div className="grid gap-4 sm:grid-cols-2">
+          {!customerMode && (
           <div className="space-y-2">
             <Label>Customer *</Label>
             <div
@@ -328,6 +430,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
               )}
             </div>
           </div>
+          )}
 
           <div className="space-y-2">
             <Label>Warehouse *</Label>
@@ -378,12 +481,73 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
               }
             />
           </div>
+
+          <div className="space-y-2">
+            <Label>Category / Folder</Label>
+            <div
+              ref={categoryContainerRef}
+              className="relative"
+              onBlur={(e) => {
+                if (
+                  !categoryContainerRef.current?.contains(
+                    e.relatedTarget as Node
+                  )
+                ) {
+                  setCategoryDropdownOpen(false);
+                }
+              }}
+            >
+              <Input
+                placeholder="e.g. T-Shirts"
+                value={orderData.order_category}
+                onChange={(e) => {
+                  setOrderData({ ...orderData, order_category: e.target.value });
+                  setCategoryDropdownOpen(true);
+                }}
+                onFocus={() => setCategoryDropdownOpen(true)}
+              />
+              {categoryDropdownOpen && matchingCategories.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+                  {matchingCategories.map((category) => (
+                    <div
+                      key={category}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setOrderData({ ...orderData, order_category: category });
+                        setCategoryDropdownOpen(false);
+                      }}
+                    >
+                      {category}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Pick an existing folder or type a new name to create one
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Shipping Label *</Label>
+            <Input
+              type="file"
+              accept={LABEL_ACCEPT}
+              onChange={(e) => setLabelFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-xs text-muted-foreground">
+              One label for the whole order. PDF, PNG or JPG, up to 10MB.
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button
             onClick={() => setStep("2")}
-            disabled={!orderData.customer_id || !orderData.warehouse_id}
+            disabled={
+              !orderData.customer_id || !orderData.warehouse_id || !labelFile
+            }
             className="w-full sm:w-auto"
           >
             Next: Add Items
@@ -449,6 +613,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                       }}
                     />
                   </div>
+                  {!customerMode && (
                   <div className="w-full space-y-2 md:w-32">
                     <Label>Unit Price (GBP)</Label>
                     <Input
@@ -472,6 +637,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                       }}
                     />
                   </div>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -513,6 +679,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
         <Card>
           <CardContent className="pt-6 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
+              {!customerMode && (
               <div className="space-y-2">
                 <Label>{chargeLabel}</Label>
                 <Input
@@ -546,6 +713,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                   Charge per unit of quantity (e.g., 0.15, -7.5, -3.35)
                 </p>
               </div>
+              )}
               <div className="space-y-2">
                 <Label>Total Quantity</Label>
                 <Input
@@ -557,6 +725,19 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                   disabled
                   className="bg-muted"
                 />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Category: </span>
+                <span className="font-medium">
+                  {orderData.order_category || "Uncategorised"}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Label: </span>
+                <span className="font-medium">{labelFile?.name ?? "None"}</span>
               </div>
             </div>
 
@@ -582,11 +763,14 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                     <span className="truncate pr-2">
                       {item.item_name || "Item"} × {item.quantity ?? 0}
                     </span>
-                    <span className="font-medium">
-                      {formatCurrency((item.quantity ?? 0) * (item.unit_price ?? 0))}
-                    </span>
+                    {!customerMode && (
+                      <span className="font-medium">
+                        {formatCurrency((item.quantity ?? 0) * (item.unit_price ?? 0))}
+                      </span>
+                    )}
                   </div>
                 ))}
+                {!customerMode && (
                 <div className="flex justify-between border-t pt-2 mt-2">
                   <span>Items Subtotal:</span>
                   <span className="font-medium">
@@ -599,6 +783,7 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                     )}
                   </span>
                 </div>
+                )}
                 <div className="flex justify-between">
                   <span>Total Items:</span>
                   <span className="font-medium">{orderItems.length}</span>
@@ -609,6 +794,12 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                     {orderItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0)}
                   </span>
                 </div>
+                {customerMode ? (
+                  <p className="border-t pt-2 mt-2 text-muted-foreground">
+                    H&S will confirm handling charges after reviewing this order.
+                  </p>
+                ) : (
+                <>
                 <div className="flex justify-between">
                   <span>{chargeSummaryLabel}</span>
                   <span className="font-medium">
@@ -632,6 +823,8 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
                     )}
                   </span>
                 </div>
+                </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -645,8 +838,12 @@ export default function OrderWizard({ onComplete }: OrderWizardProps) {
           >
             Back
           </Button>
-          <Button onClick={handleSubmit} className="w-full sm:w-auto">
-            Create Order
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="w-full sm:w-auto"
+          >
+            {submitting ? "Creating..." : "Create Order"}
           </Button>
         </div>
       </TabsContent>

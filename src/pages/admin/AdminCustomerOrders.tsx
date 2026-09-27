@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,21 +9,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import Spinner from "@/components/Spinner";
 import TablePagination from "@/components/TablePagination";
+import OrderStatusDialog from "@/components/OrderStatusDialog";
 import OrderDetailsDialog from "@/components/OrderDetailsDialog";
-import OrderWizard, { type OrderWizardInitial } from "@/components/OrderWizard";
 import BulkLabelWizard from "@/components/BulkLabelWizard";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Select,
   SelectContent,
@@ -52,16 +53,16 @@ import {
 import { formatCurrency } from "@/lib/currency";
 import { toast } from "sonner";
 import {
+  ArrowLeft,
+  CheckCheck,
   Download,
+  Layers,
   FileArchive,
   Files,
   Folder,
-  Plus,
-  Layers,
-  RotateCcw,
+  RefreshCw,
   Search,
-  Truck,
-  X,
+  Trash2,
 } from "lucide-react";
 
 interface Order {
@@ -69,18 +70,20 @@ interface Order {
   order_number: string;
   status: string;
   order_type: string;
-  warehouse_id: string;
   requested_date: string;
+  completed_date: string | null;
   created_at: string;
   total_items: number;
   total_quantity: number;
   total_charges: number | null;
   order_category: string | null;
   label_path: string | null;
+  viewed_at: string | null;
   warehouses: { warehouse_name: string } | null;
   outbound_order_items?: { order_item: string; quantity: number }[];
 }
 
+/** A selected order, kept whole so a merge can span pages we no longer hold. */
 interface SelectedLabel {
   id: string;
   orderNumber: string;
@@ -90,6 +93,7 @@ interface SelectedLabel {
 interface CategoryStat {
   order_category: string;
   order_count: number;
+  unread_count: number;
   label_count: number;
 }
 
@@ -101,28 +105,14 @@ const ORDER_SELECT = `
 
 const UNCATEGORISED = "Uncategorised";
 
-/** Every status the database allows, in the order an order moves through them. */
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "picking", label: "Picking" },
-  { value: "packed", label: "Packed" },
-  { value: "ready", label: "Ready" },
-  { value: "in_transit", label: "In transit" },
-  { value: "delivered", label: "Delivered" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
-const AWAITING_DISPATCH = ["pending", "approved", "picking", "packed", "ready"];
-
-/**
- * A new order has no charges until H&S prices it, so £0.00 would read as free.
- */
-function chargeLabel(order: Order) {
-  const charges = order.total_charges ?? 0;
-  if (charges === 0 && order.status === "pending") return "Awaiting pricing";
-  return formatCurrency(charges);
+/** Unread first, then newest — so new requests always sit at the top. */
+function orderedQuery<T>(query: {
+  order: (
+    column: string,
+    options: { ascending: boolean; nullsFirst?: boolean }
+  ) => T;
+}) {
+  return query.order("viewed_at", { ascending: true, nullsFirst: true });
 }
 
 interface OrderRowProps {
@@ -130,9 +120,9 @@ interface OrderRowProps {
   selected: boolean;
   onToggle: (order: Order) => void;
   onOpen: (order: Order) => void;
+  onStatus: (order: Order) => void;
+  onDelete: (order: Order) => void;
   onLabel: (order: Order) => void;
-  onReorder: (order: Order) => void;
-  onCancel: (order: Order) => void;
   showCategory?: boolean;
 }
 
@@ -141,13 +131,19 @@ function OrderRow({
   selected,
   onToggle,
   onOpen,
+  onStatus,
+  onDelete,
   onLabel,
-  onReorder,
-  onCancel,
   showCategory,
 }: OrderRowProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-border bg-card p-3 md:flex-row md:items-center md:gap-4">
+    <div
+      className={`flex flex-col gap-3 rounded-[var(--radius-lg)] border p-3 transition-colors md:flex-row md:items-center md:gap-4 ${
+        order.viewed_at
+          ? "border-border bg-card"
+          : "border-primary/50 bg-primary/5"
+      }`}
+    >
       <div className="flex items-start gap-3 md:items-center">
         <Checkbox
           checked={selected}
@@ -159,9 +155,16 @@ function OrderRow({
         <button
           type="button"
           onClick={() => onOpen(order)}
-          className="min-w-0 text-left md:w-40"
+          className="min-w-0 flex-1 text-left md:w-44 md:flex-none"
         >
-          <p className="font-semibold">{order.order_number}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-semibold">{order.order_number}</span>
+            {!order.viewed_at && (
+              <Badge className="bg-destructive text-destructive-foreground hover:bg-destructive">
+                New
+              </Badge>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             {new Date(order.created_at).toLocaleDateString("en-GB")}
             {showCategory && ` · ${order.order_category || UNCATEGORISED}`}
@@ -182,7 +185,12 @@ function OrderRow({
         </p>
         <p className="text-xs text-muted-foreground">
           {order.total_items} items · {order.total_quantity} units ·{" "}
-          {chargeLabel(order)}
+          {(order.total_charges ?? 0) === 0 ? (
+            // Prompt the admin: an unpriced order would invoice at £0
+            <span className="font-semibold text-destructive">Not priced</span>
+          ) : (
+            formatCurrency(order.total_charges)
+          )}
         </p>
       </button>
 
@@ -190,7 +198,7 @@ function OrderRow({
         <StatusBadge status={order.status} />
 
         <div className="flex items-center gap-1">
-          {order.label_path && (
+          {order.label_path ? (
             <Button
               size="icon"
               variant="ghost"
@@ -199,26 +207,26 @@ function OrderRow({
             >
               <Download className="h-4 w-4" />
             </Button>
+          ) : (
+            <span className="px-2 text-xs text-muted-foreground">No label</span>
           )}
           <Button
             size="icon"
             variant="ghost"
-            title="Order these items again"
-            onClick={() => onReorder(order)}
+            title="Update status"
+            onClick={() => onStatus(order)}
           >
-            <RotateCcw className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4" />
           </Button>
-          {order.status === "pending" && (
-            <Button
-              size="icon"
-              variant="ghost"
-              title="Cancel this order"
-              className="text-destructive hover:text-destructive"
-              onClick={() => onCancel(order)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            title="Delete order"
+            className="text-destructive hover:text-destructive"
+            onClick={() => onDelete(order)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
@@ -230,16 +238,14 @@ interface CategorySectionProps {
   category: string;
   rowProps: Omit<OrderRowProps, "order" | "selected">;
   isSelected: (id: string) => boolean;
-  refreshKey: number;
 }
 
-/** Orders in one folder. Mounted only while the folder is open. */
+/** Orders inside one folder. Only mounted while the folder is open. */
 function CategorySection({
   customerId,
   category,
   rowProps,
   isSelected,
-  refreshKey,
 }: CategorySectionProps) {
   const orders = usePagedQuery<Order>(
     () => {
@@ -248,7 +254,7 @@ function CategorySection({
         .select(ORDER_SELECT, { count: "exact" })
         .eq("customer_id", customerId);
 
-      return (
+      return orderedQuery(
         category === UNCATEGORISED
           ? query.is("order_category", null)
           : query.eq("order_category", category)
@@ -256,7 +262,7 @@ function CategorySection({
         .order("created_at", { ascending: false })
         .returns<Order[]>();
     },
-    [customerId, category, refreshKey]
+    [customerId, category]
   );
 
   if (orders.loading) {
@@ -290,59 +296,58 @@ function CategorySection({
   );
 }
 
-export default function CustomerOrders() {
-  const [customerId, setCustomerId] = useState<string | null>(null);
-  const [customerLoading, setCustomerLoading] = useState(true);
+export default function AdminCustomerOrders() {
+  const { customerId = "" } = useParams();
+  const [customer, setCustomer] = useState<{
+    name: string;
+    code: string;
+  } | null>(null);
   const [view, setView] = useState<"list" | "categories">("list");
   const [categories, setCategories] = useState<CategoryStat[]>([]);
-  const [tiles, setTiles] = useState({
-    total: 0,
-    awaiting: 0,
-    inTransit: 0,
-    delivered: 0,
-  });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const debouncedSearch = useDebounced(searchTerm);
 
   const [selected, setSelected] = useState<SelectedLabel[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusTarget, setStatusTarget] = useState<Order | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsId, setDetailsId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [markAllOpen, setMarkAllOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [reorderFrom, setReorderFrom] = useState<
-    OrderWizardInitial | undefined
-  >();
-  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
 
   useEffect(() => {
-    const resolveCustomer = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setCustomerLoading(false);
-        return;
-      }
+    if (!customerId) return;
+    supabase
+      .from("customers")
+      .select("company_name, contact_person, customer_code")
+      .eq("id", customerId)
+      .maybeSingle()
+      .then(({ data }) =>
+        setCustomer(
+          data
+            ? {
+                name: data.company_name || data.contact_person,
+                code: data.customer_code,
+              }
+            : null
+        )
+      );
+  }, [customerId]);
 
-      const { data: userRole } = await supabase
-        .from("user_roles")
-        .select("customer_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+  const loadCategories = () => {
+    if (!customerId) return;
+    supabase
+      .rpc("customer_order_category_stats", { p_customer_id: customerId })
+      .then(({ data }) => setCategories(data ?? []));
+  };
 
-      setCustomerId(userRole?.customer_id ?? null);
-      setCustomerLoading(false);
-    };
-
-    resolveCustomer();
-  }, []);
+  useEffect(loadCategories, [customerId]);
 
   const orders = usePagedQuery<Order>(
     customerId
@@ -364,88 +369,23 @@ export default function CustomerOrders() {
               .lte("requested_date", range.to);
           }
 
-          if (categoryFilter === "none") {
-            query = query.is("order_category", null);
-          } else if (categoryFilter !== "all") {
-            query = query.eq("order_category", categoryFilter);
-          }
-
-          return query
+          return orderedQuery(query)
             .order("created_at", { ascending: false })
             .returns<Order[]>();
         }
       : null,
-    [
-      customerId,
-      debouncedSearch,
-      statusFilter,
-      dateFilter,
-      categoryFilter,
-      refreshKey,
-    ]
+    [customerId, debouncedSearch, statusFilter, dateFilter]
   );
 
-  // Folder list and summary tiles both count every order, not the page on screen
-  const loadSummary = useCallback(async () => {
-    if (!customerId) return;
+  const unreadTotal = categories.reduce(
+    (sum, category) => sum + Number(category.unread_count),
+    0
+  );
 
-    const { data } = await supabase.rpc("customer_order_category_stats", {
-      p_customer_id: customerId,
-    });
-    setCategories(data ?? []);
-
-    const countBy = (apply: (query: any) => any) =>
-      apply(
-        supabase
-          .from("outbound_orders")
-          .select("id", { count: "exact", head: true })
-          .eq("customer_id", customerId)
-      );
-
-    const [all, awaiting, inTransit, delivered] = await Promise.all([
-      countBy((query) => query),
-      countBy((query) => query.in("status", AWAITING_DISPATCH)),
-      countBy((query) => query.eq("status", "in_transit")),
-      countBy((query) => query.in("status", ["delivered", "completed"])),
-    ]);
-
-    setTiles({
-      total: all.count ?? 0,
-      awaiting: awaiting.count ?? 0,
-      inTransit: inTransit.count ?? 0,
-      delivered: delivered.count ?? 0,
-    });
-  }, [customerId]);
-
-  useEffect(() => {
-    loadSummary();
-  }, [loadSummary, refreshKey]);
-
-  // The warehouse moves orders along; reflect that without a manual refresh
-  useEffect(() => {
-    if (!customerId) return;
-
-    const channel = supabase
-      .channel(`customer-orders-${customerId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "outbound_orders",
-          filter: `customer_id=eq.${customerId}`,
-        },
-        () => refresh()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [customerId]);
-
-  const refresh = () => setRefreshKey((key) => key + 1);
-  const loading = customerLoading || orders.loading;
+  const refreshAll = () => {
+    orders.refetch();
+    loadCategories();
+  };
 
   // ── selection ───────────────────────────────────────────────────────────
   const isSelected = (orderId: string) =>
@@ -509,12 +449,12 @@ export default function CustomerOrders() {
       toast.success(`Zipped ${selected.length} labels`);
     });
 
-  /** Every label in a folder, not just the page on screen. */
+  /** Every label in a folder, fetched on demand — not just the page on screen. */
   const categoryLabels = async (category: string) => {
     let query = supabase
       .from("outbound_orders")
       .select("order_number, label_path")
-      .eq("customer_id", customerId as string)
+      .eq("customer_id", customerId)
       .not("label_path", "is", null);
 
     query =
@@ -542,146 +482,121 @@ export default function CustomerOrders() {
         labels.map((label) => label.path),
         `${category}-labels-${today()}.pdf`
       );
-      toast.success(`Merged ${labels.length} labels`);
+      toast.success(`Merged ${labels.length} labels from ${category}`);
     });
 
   const zipCategory = (category: string) =>
     runDownload(`zip-${category}`, async () => {
       const labels = await categoryLabels(category);
       await downloadLabelsZip(labels, `${category}-labels-${today()}.zip`);
-      toast.success(`Zipped ${labels.length} labels`);
+      toast.success(`Zipped ${labels.length} labels from ${category}`);
     });
 
   // ── order actions ───────────────────────────────────────────────────────
   const openOrder = (order: Order) => {
     setDetailsId(order.id);
     setDetailsOpen(true);
-  };
 
-  /** Copies a past order's lines into a fresh order. A new label is required. */
-  const startReorder = async (order: Order) => {
-    const { data, error } = await supabase
-      .from("outbound_order_items")
-      .select("inventory_item_id, quantity, unit_price")
-      .eq("outbound_order_id", order.id);
-
-    if (error || !data?.length) {
-      toast.error("Could not load the items from that order");
-      return;
+    if (!order.viewed_at) {
+      supabase
+        .from("outbound_orders")
+        .update({ viewed_at: new Date().toISOString() })
+        .eq("id", order.id)
+        .then(refreshAll);
     }
-
-    setReorderFrom({
-      warehouse_id: order.warehouse_id,
-      order_type: order.order_type,
-      order_category: order.order_category,
-      items: data.map((item) => ({
-        inventory_item_id: item.inventory_item_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price ?? 0,
-      })),
-    });
-    setCreateOpen(true);
   };
 
-  const confirmCancel = async () => {
-    if (!cancelTarget) return;
+  const openStatus = (order: Order) => {
+    setStatusTarget(order);
+    setStatusDialogOpen(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     const { error } = await supabase
       .from("outbound_orders")
       .delete()
-      .eq("id", cancelTarget.id);
+      .eq("id", deleteTarget.id);
 
     if (error) {
-      toast.error(
-        "This order can no longer be cancelled — please contact H&S E-commerce"
-      );
+      toast.error(error.message || "Failed to delete order");
     } else {
-      // Stock returns automatically via the order item triggers
-      if (cancelTarget.label_path) await removeLabel(cancelTarget.label_path);
+      // Stock is returned by the order item triggers; drop the orphaned label
+      if (deleteTarget.label_path) await removeLabel(deleteTarget.label_path);
       setSelected((prev) =>
-        prev.filter((entry) => entry.id !== cancelTarget.id)
+        prev.filter((entry) => entry.id !== deleteTarget.id)
       );
-      toast.success(`Order ${cancelTarget.order_number} cancelled`);
-      refresh();
+      toast.success("Order deleted");
+      refreshAll();
     }
-    setCancelTarget(null);
+    setDeleteTarget(null);
   };
 
-  const closeWizard = () => {
-    setCreateOpen(false);
-    setReorderFrom(undefined);
+  const markAllRead = async () => {
+    const { error } = await supabase
+      .from("outbound_orders")
+      .update({ viewed_at: new Date().toISOString() })
+      .eq("customer_id", customerId)
+      .is("viewed_at", null);
+
+    if (error) {
+      toast.error(error.message || "Failed to mark orders as read");
+    } else {
+      toast.success("Orders marked as read");
+      refreshAll();
+    }
+    setMarkAllOpen(false);
   };
 
   const rowProps = {
     onToggle: toggleSelected,
     onOpen: openOrder,
+    onStatus: openStatus,
+    onDelete: setDeleteTarget,
     onLabel: handleSingleLabel,
-    onReorder: startReorder,
-    onCancel: setCancelTarget,
   };
 
-  const hasFilters =
-    statusFilter !== "all" || dateFilter !== "all" || categoryFilter !== "all";
-
   return (
-    <div className="space-y-5 pb-20 md:pb-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            My Orders
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1">
+            <Link to="/admin/orders">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              All customers
+            </Link>
+          </Button>
+          <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">
+            {customer?.name ?? "Customer orders"}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Create orders and track them through to delivery
+            {customer?.code}
+            {unreadTotal > 0 && ` · ${unreadTotal} new`}
           </p>
         </div>
+
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Button
             variant="outline"
-            className="w-full sm:w-auto"
-            disabled={!customerId}
+            size="sm"
             onClick={() => setBulkOpen(true)}
+            className="w-full sm:w-auto"
           >
             <Layers className="mr-2 h-4 w-4" />
-            Bulk Upload Labels
+            Bulk labels
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            disabled={unreadTotal === 0}
+            onClick={() => setMarkAllOpen(true)}
             className="w-full sm:w-auto"
-            disabled={!customerId}
-            onClick={() => {
-              setReorderFrom(undefined);
-              setCreateOpen(true);
-            }}
           >
-            <Plus className="mr-2 h-4 w-4" />
-            Create Order
+            <CheckCheck className="mr-2 h-4 w-4" />
+            Mark all read
           </Button>
         </div>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: "Total orders", value: tiles.total, tone: "" },
-          {
-            label: "Awaiting dispatch",
-            value: tiles.awaiting,
-            tone: "text-amber-600",
-          },
-          { label: "In transit", value: tiles.inTransit, tone: "text-blue-600" },
-          {
-            label: "Delivered",
-            value: tiles.delivered,
-            tone: "text-green-600",
-          },
-        ].map((tile) => (
-          <div
-            key={tile.label}
-            className="rounded-[var(--radius-lg)] border border-border bg-card px-4 py-3"
-          >
-            <p className="text-xs text-muted-foreground">{tile.label}</p>
-            <p className={`text-2xl font-bold ${tile.tone}`}>{tile.value}</p>
-          </div>
-        ))}
       </div>
 
       {/* View switch */}
@@ -704,6 +619,7 @@ export default function CustomerOrders() {
         ))}
       </div>
 
+      {/* Selection actions */}
       {selected.length > 0 && (
         <Card className="border-primary/50 bg-primary/5">
           <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -741,8 +657,9 @@ export default function CustomerOrders() {
       {view === "list" ? (
         <Card>
           <CardContent className="space-y-4 p-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="relative lg:col-span-1">
+            {/* Filters */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="relative sm:col-span-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search order number..."
@@ -751,41 +668,21 @@ export default function CustomerOrders() {
                   className="pl-10"
                 />
               </div>
-
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="packed">Packed</SelectItem>
+                  <SelectItem value="in_transit">In transit</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  <SelectItem value="none">Uncategorised</SelectItem>
-                  {categories
-                    .filter((stat) => stat.order_category)
-                    .map((stat) => (
-                      <SelectItem
-                        key={stat.order_category}
-                        value={stat.order_category}
-                      >
-                        {stat.order_category}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="All time" />
@@ -799,32 +696,14 @@ export default function CustomerOrders() {
               </Select>
             </div>
 
-            {loading ? (
+            {orders.loading ? (
               <div className="flex justify-center py-12">
                 <Spinner label="Loading orders" />
               </div>
             ) : orders.rows.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-12 text-center">
-                <Truck className="h-8 w-8 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">
-                    {hasFilters || debouncedSearch
-                      ? "No orders match those filters"
-                      : "No orders yet"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {hasFilters || debouncedSearch
-                      ? "Try clearing a filter."
-                      : "Create your first order and attach its shipping label."}
-                  </p>
-                </div>
-                {!hasFilters && !debouncedSearch && (
-                  <Button onClick={() => setCreateOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Order
-                  </Button>
-                )}
-              </div>
+              <p className="py-12 text-center text-muted-foreground">
+                No orders found
+              </p>
             ) : (
               <div className="space-y-2">
                 {orders.rows.map((order) => (
@@ -853,7 +732,7 @@ export default function CustomerOrders() {
       ) : categories.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            You have no orders yet
+            This customer has no orders yet
           </CardContent>
         </Card>
       ) : (
@@ -871,6 +750,11 @@ export default function CustomerOrders() {
                     <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="truncate font-semibold">{name}</span>
                     <Badge variant="secondary">{stat.order_count}</Badge>
+                    {Number(stat.unread_count) > 0 && (
+                      <Badge className="bg-destructive text-destructive-foreground hover:bg-destructive">
+                        {stat.unread_count} new
+                      </Badge>
+                    )}
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
@@ -905,11 +789,10 @@ export default function CustomerOrders() {
                   </div>
 
                   <CategorySection
-                    customerId={customerId as string}
+                    customerId={customerId}
                     category={name}
                     rowProps={rowProps}
                     isSelected={isSelected}
-                    refreshKey={refreshKey}
                   />
                 </AccordionContent>
               </AccordionItem>
@@ -918,74 +801,82 @@ export default function CustomerOrders() {
         </Accordion>
       )}
 
-      <Dialog
-        open={createOpen}
-        onOpenChange={(open) => (open ? setCreateOpen(true) : closeWizard())}
-      >
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {reorderFrom ? "Reorder" : "Create New Order"}
-            </DialogTitle>
-          </DialogHeader>
-          {customerId && (
-            <OrderWizard
-              key={reorderFrom ? "reorder" : "new"}
-              customerId={customerId}
-              initialOrder={reorderFrom}
-              onComplete={() => {
-                closeWizard();
-                refresh();
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Bulk upload labels</DialogTitle>
           </DialogHeader>
-          {customerId && (
-            <BulkLabelWizard
-              customerId={customerId}
-              onComplete={() => {
-                setBulkOpen(false);
-                refresh();
-              }}
-            />
-          )}
+          <BulkLabelWizard
+            customerId={customerId}
+            adminMode
+            onComplete={() => {
+              setBulkOpen(false);
+              refreshAll();
+            }}
+          />
         </DialogContent>
       </Dialog>
+
+      {statusTarget && (
+        <OrderStatusDialog
+          open={statusDialogOpen}
+          onOpenChange={setStatusDialogOpen}
+          orderId={statusTarget.id}
+          currentStatus={statusTarget.status}
+          onSuccess={refreshAll}
+        />
+      )}
 
       <OrderDetailsDialog
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
         orderId={detailsId}
-        showCustomerInfo={false}
-        onDeleted={refresh}
+        showCustomerInfo
+        onStatusUpdate={(orderId, currentStatus) => {
+          setDetailsOpen(false);
+          setStatusTarget({ id: orderId, status: currentStatus } as Order);
+          setStatusDialogOpen(true);
+        }}
+        onDeleted={() => {
+          setDetailsOpen(false);
+          refreshAll();
+        }}
       />
 
       <AlertDialog
-        open={!!cancelTarget}
-        onOpenChange={(open) => !open && setCancelTarget(null)}
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Cancel order {cancelTarget?.order_number}?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Delete this order?</AlertDialogTitle>
             <AlertDialogDescription>
-              The order and its shipping label will be removed and the stock
-              returned to your inventory. This can only be done while an order is
-              still pending, and it cannot be undone.
+              Order {deleteTarget?.order_number} and its items will be deleted,
+              its stock returned to inventory and its shipping label removed.
+              This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep order</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmCancel}>
-              Cancel order
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={markAllOpen} onOpenChange={setMarkAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark all as read?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Clears the new indicator on {unreadTotal}{" "}
+              {unreadTotal === 1 ? "order" : "orders"} for {customer?.name}. The
+              orders themselves are not changed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={markAllRead}>
+              Mark all read
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

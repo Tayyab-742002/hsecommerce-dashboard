@@ -27,6 +27,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import TablePagination from "@/components/TablePagination";
+import { usePagedQuery } from "@/hooks/usePagedQuery";
+import { useDebounced } from "@/hooks/useDebounced";
+import { useCustomerMatches } from "@/hooks/useCustomerMatches";
+import { likeTerm } from "@/lib/dateRange";
 
 
 interface Pallet {
@@ -55,8 +60,6 @@ interface Pallet {
 }
 
 export default function AdminPallets() {
-  const [pallets, setPallets] = useState<Pallet[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -74,11 +77,13 @@ export default function AdminPallets() {
   const [editPalletOpen, setEditPalletOpen] = useState(false);
   const [editPalletId, setEditPalletId] = useState<string | null>(null);
 
-  const fetchPallets = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("pallets")
-        .select(`
+  const debouncedSearch = useDebounced(searchTerm);
+  const customerMatches = useCustomerMatches(debouncedSearch);
+
+  const pallets = usePagedQuery<Pallet>(
+    () => {
+      let query = supabase.from("pallets").select(
+        `
           *,
           customers (company_name, contact_person),
           warehouses (warehouse_name),
@@ -87,48 +92,55 @@ export default function AdminPallets() {
             quantity,
             inventory_items (item_name, sku, item_code)
           )
-        `)
-        .order("created_at", { ascending: false });
+        `,
+        { count: "exact" }
+      );
 
-      if (error) throw error;
-      setPallets((data as unknown as Pallet[]) || []);
-    } catch (error) {
-      console.error("Error fetching pallets:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      const term = debouncedSearch.trim();
+      if (term) {
+        const clauses = [
+          `pallet_number.ilike.${likeTerm(term)}`,
+          `container_number.ilike.${likeTerm(term)}`,
+          `location.ilike.${likeTerm(term)}`,
+        ];
+        if (customerMatches?.length) {
+          clauses.push(`customer_id.in.(${customerMatches.join(",")})`);
+        }
+        query = query.or(clauses.join(","));
+      }
+
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (customerFilter !== "all") {
+        query = query.eq("customer_id", customerFilter);
+      }
+
+      return query.order("created_at", { ascending: false }).returns<Pallet[]>();
+    },
+    [debouncedSearch, customerMatches, statusFilter, customerFilter]
+  );
+
+  const loading = pallets.loading;
+  const fetchPallets = pallets.refetch;
+
+  // The customer filter can no longer be derived from one page of pallets
+  const [customerOptions, setCustomerOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
 
   useEffect(() => {
-    fetchPallets();
-  }, [fetchPallets]);
-
-  const filteredPallets = pallets.filter((p) => {
-    const customerName =
-      p.customers?.company_name || p.customers?.contact_person || "";
-    const matchesSearch =
-      p.pallet_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.container_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.location || "").toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
-    const matchesCustomer =
-      customerFilter === "all" || p.customer_id === customerFilter;
-
-    return matchesSearch && matchesStatus && matchesCustomer;
-  });
-
-  const uniqueCustomers = Array.from(
-    new Map(
-      pallets
-        .filter((p) => p.customers)
-        .map((p) => [
-          p.customer_id,
-          { id: p.customer_id, name: p.customers!.company_name || p.customers!.contact_person },
-        ])
-    ).values()
-  );
+    supabase
+      .from("customers")
+      .select("id, company_name, contact_person")
+      .order("company_name")
+      .then(({ data }) =>
+        setCustomerOptions(
+          (data ?? []).map((customer) => ({
+            id: customer.id,
+            name: customer.company_name || customer.contact_person,
+          }))
+        )
+      );
+  }, []);
 
   const hasActiveFilters =
     statusFilter !== "all" || customerFilter !== "all" || searchTerm !== "";
@@ -217,6 +229,7 @@ export default function AdminPallets() {
     return remaining > 0 ? `${preview} +${remaining} more` : preview;
   };
 
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -296,7 +309,7 @@ export default function AdminPallets() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Customers</SelectItem>
-                    {uniqueCustomers.map((c) => (
+                    {customerOptions.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
                       </SelectItem>
@@ -308,7 +321,7 @@ export default function AdminPallets() {
           )}
 
           <div className="text-sm text-muted-foreground">
-            Showing {filteredPallets.length} of {pallets.length} pallets
+
           </div>
         </CardHeader>
 
@@ -319,12 +332,12 @@ export default function AdminPallets() {
               <div className="flex items-center justify-center py-12">
                 <Spinner label="Loading pallets" />
               </div>
-            ) : filteredPallets.length === 0 ? (
+            ) : pallets.rows.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No pallets found
               </div>
             ) : (
-              filteredPallets.map((pallet) => (
+              pallets.rows.map((pallet) => (
                 <div
                   key={pallet.id}
                   className="rounded-lg border border-border bg-card p-3 shadow-sm"
@@ -389,14 +402,14 @@ export default function AdminPallets() {
                         Loading pallets...
                       </td>
                     </tr>
-                  ) : filteredPallets.length === 0 ? (
+                  ) : pallets.rows.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
                         No pallets found
                       </td>
                     </tr>
                   ) : (
-                    filteredPallets.map((pallet) => (
+                    pallets.rows.map((pallet) => (
                       <tr
                         key={pallet.id}
                         className="border-b border-border/60 last:border-b-0"
@@ -462,6 +475,15 @@ export default function AdminPallets() {
               </table>
             </div>
           </div>
+        <TablePagination
+            page={pallets.page}
+            pageCount={pallets.pageCount}
+            from={pallets.from}
+            to={pallets.to}
+            total={pallets.total}
+            onPageChange={pallets.setPage}
+            label="pallets"
+          />
         </CardContent>
       </Card>
 

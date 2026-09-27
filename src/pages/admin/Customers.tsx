@@ -20,6 +20,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import TablePagination from "@/components/TablePagination";
+import { usePagedQuery } from "@/hooks/usePagedQuery";
+import { useDebounced } from "@/hooks/useDebounced";
+import { likeTerm } from "@/lib/dateRange";
 
 interface Customer {
   id: string;
@@ -41,9 +45,7 @@ interface Customer {
 }
 
 export default function AdminCustomers() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<
     Customer | undefined
@@ -56,46 +58,64 @@ export default function AdminCustomers() {
     fetchCustomers();
   }, []);
 
-  const fetchCustomers = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .order("created_at", { ascending: false });
+  const debouncedSearch = useDebounced(searchTerm);
+  const [revenue, setRevenue] = useState<Record<string, number>>({});
 
-    if (!error && data) {
-      // Fetch revenue for each customer
-      const customersWithRevenue = await Promise.all(
-        data.map(async (customer) => {
-          const { data: orders } = await supabase
-            .from("outbound_orders")
-            .select("total_charges")
-            .eq("customer_id", customer.id);
+  const customers = usePagedQuery<Customer>(
+    () => {
+      let query = supabase
+        .from("customers")
+        .select("*", { count: "exact" });
 
-          const totalRevenue =
-            orders?.reduce(
-              (sum, order) => sum + (order.total_charges || 0),
-              0
-            ) || 0;
+      const term = debouncedSearch.trim();
+      if (term) {
+        query = query.or(
+          [
+            `customer_code.ilike.${likeTerm(term)}`,
+            `company_name.ilike.${likeTerm(term)}`,
+            `contact_person.ilike.${likeTerm(term)}`,
+            `email.ilike.${likeTerm(term)}`,
+          ].join(",")
+        );
+      }
 
-          return { ...customer, total_revenue: totalRevenue };
-        })
-      );
-
-      setCustomers(customersWithRevenue);
-    }
-    setLoading(false);
-  };
-
-  const filteredCustomers = customers.filter(
-    (customer) =>
-      customer.customer_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.contact_person
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      return query
+        .order("created_at", { ascending: false })
+        .returns<Customer[]>();
+    },
+    [debouncedSearch]
   );
+
+  const loading = customers.loading;
+  const fetchCustomers = customers.refetch;
+
+  // Revenue for the 25 customers on screen, in one query instead of one each
+  useEffect(() => {
+    const ids = customers.rows.map((customer) => customer.id);
+    if (ids.length === 0) {
+      setRevenue({});
+      return;
+    }
+
+    let cancelled = false;
+    supabase
+      .from("outbound_orders")
+      .select("customer_id, total_charges")
+      .in("customer_id", ids)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const totals: Record<string, number> = {};
+        for (const order of data ?? []) {
+          totals[order.customer_id] =
+            (totals[order.customer_id] ?? 0) + (order.total_charges ?? 0);
+        }
+        setRevenue(totals);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customers.rows]);
 
   const handleEdit = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -133,6 +153,7 @@ export default function AdminCustomers() {
   const handleViewInventory = (customerId: string) => {
     navigate(`/admin/inventory?customer=${customerId}`);
   };
+
 
   return (
     <div className="space-y-6">
@@ -172,7 +193,7 @@ export default function AdminCustomers() {
             <div className="flex items-center justify-center py-12">
               <Spinner label="Loading customers" />
             </div>
-          ) : filteredCustomers.length === 0 ? (
+          ) : customers.rows.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No customers found
             </div>
@@ -180,7 +201,7 @@ export default function AdminCustomers() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
-                {filteredCustomers.map((customer) => (
+                {customers.rows.map((customer) => (
                   <div
                     key={customer.id}
                     className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
@@ -253,7 +274,7 @@ export default function AdminCustomers() {
                           Total Revenue
                         </div>
                         <div className="text-right font-semibold text-primary">
-                          {formatCurrency(customer.total_revenue || 0)}
+                          {formatCurrency(revenue[customer.id] || 0)}
                         </div>
                       </div>
                     </div>
@@ -311,7 +332,7 @@ export default function AdminCustomers() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredCustomers.map((customer) => (
+                      {customers.rows.map((customer) => (
                         <tr
                           key={customer.id}
                           className="cursor-pointer"
@@ -358,7 +379,7 @@ export default function AdminCustomers() {
                             {customer.tax_id || "-"}
                           </td> */}
                           <td className="whitespace-nowrap font-semibold text-primary">
-                            {formatCurrency(customer.total_revenue || 0)}
+                            {formatCurrency(revenue[customer.id] || 0)}
                           </td>
                           <td className="whitespace-nowrap">
                             {new Date(customer.created_at).toLocaleDateString()}
@@ -404,6 +425,15 @@ export default function AdminCustomers() {
                   </table>
                 </div>
               </div>
+            <TablePagination
+            page={customers.page}
+            pageCount={customers.pageCount}
+            from={customers.from}
+            to={customers.to}
+            total={customers.total}
+            onPageChange={customers.setPage}
+            label="customers"
+          />
             </>
           )}
         </CardContent>

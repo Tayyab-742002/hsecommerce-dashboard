@@ -5,6 +5,9 @@ import { KPICard } from "@/components/KPICard";
 import Spinner from "@/components/Spinner";
 import { formatCurrency } from "@/lib/currency";
 import { PoundSterling, TrendingUp, Package } from "lucide-react";
+import TablePagination from "@/components/TablePagination";
+import CustomerInvoices from "@/components/CustomerInvoices";
+import { usePagedQuery } from "@/hooks/usePagedQuery";
 
 export default function CustomerBilling() {
   const [stats, setStats] = useState({
@@ -12,64 +15,63 @@ export default function CustomerBilling() {
     monthlyCharges: 0,
     totalOrders: 0,
   });
-  const [recentCharges, setRecentCharges] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerLoading, setCustomerLoading] = useState(true);
 
   useEffect(() => {
-    fetchBillingData();
+    resolveCustomer();
   }, []);
 
-  const fetchBillingData = async () => {
+  const resolveCustomer = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setCustomerLoading(false);
+      return;
+    }
 
-    const { data: userRole, error: roleError } = await supabase
+    const { data: userRole } = await supabase
       .from("user_roles")
       .select("customer_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // If no role found or no customer_id, user cannot access customer billing
-    if (roleError || !userRole?.customer_id) {
-      setLoading(false);
-      return;
-    }
-
-    // Fetch all orders for this customer
-    const { data: orders } = await supabase
-      .from("outbound_orders")
-      .select("*")
-      .eq("customer_id", userRole.customer_id);
-
-    if (orders) {
-      const totalCharges = orders.reduce(
-        (sum, order) => sum + (order.total_charges || 0),
-        0
-      );
-
-      // Calculate monthly charges
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      const monthlyOrders = orders.filter(
-        (order) => new Date(order.created_at) >= startOfMonth
-      );
-      const monthlyCharges = monthlyOrders.reduce(
-        (sum, order) => sum + (order.total_charges || 0),
-        0
-      );
-
-      setStats({
-        totalCharges,
-        monthlyCharges,
-        totalOrders: orders.length,
-      });
-
-      setRecentCharges(orders.slice(0, 10));
-    }
-    setLoading(false);
+    setCustomerId(userRole?.customer_id ?? null);
+    setCustomerLoading(false);
   };
+
+  // Totals are summed in the database — they used to mean fetching every order
+  useEffect(() => {
+    if (!customerId) return;
+
+    supabase
+      .rpc("customer_billing_summary", { p_customer_id: customerId })
+      .then(({ data }) => {
+        const summary = data?.[0];
+        if (!summary) return;
+        setStats({
+          totalCharges: Number(summary.total_charges),
+          monthlyCharges: Number(summary.monthly_charges),
+          totalOrders: Number(summary.total_orders),
+        });
+      });
+  }, [customerId]);
+
+  const charges = usePagedQuery<any>(
+    customerId
+      ? () =>
+          supabase
+            .from("outbound_orders")
+            .select("*", { count: "exact" })
+            .eq("customer_id", customerId)
+            .order("created_at", { ascending: false })
+      : null,
+    [customerId]
+  );
+
+  const loading = customerLoading || charges.loading;
+
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -97,16 +99,18 @@ export default function CustomerBilling() {
         />
       </div>
 
+      <CustomerInvoices customerId={customerId} />
+
       <Card>
         <CardHeader>
-          <CardTitle>Recent Charges</CardTitle>
+          <CardTitle>Order Charges</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Spinner label="Loading charges" />
             </div>
-          ) : recentCharges.length === 0 ? (
+          ) : charges.rows.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No charges found
             </div>
@@ -114,7 +118,7 @@ export default function CustomerBilling() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
-                {recentCharges.map((charge) => (
+                {charges.rows.map((charge) => (
                   <div
                     key={charge.id}
                     className="border border-border rounded-[var(--radius-lg)] bg-card p-3 shadow-sm"
@@ -161,7 +165,7 @@ export default function CustomerBilling() {
                       </tr>
                     </thead>
                     <tbody>
-                      {recentCharges.map((charge) => (
+                      {charges.rows.map((charge) => (
                         <tr key={charge.id}>
                           <td className="font-medium whitespace-nowrap">
                             {charge.order_number}
@@ -182,6 +186,15 @@ export default function CustomerBilling() {
                   </table>
                 </div>
               </div>
+            <TablePagination
+            page={charges.page}
+            pageCount={charges.pageCount}
+            from={charges.from}
+            to={charges.to}
+            total={charges.total}
+            onPageChange={charges.setPage}
+            label="charges"
+          />
             </>
           )}
         </CardContent>

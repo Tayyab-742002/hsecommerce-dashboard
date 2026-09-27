@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, NavLink } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   Users,
   FileText,
   Settings,
+  Receipt,
   LogOut,
   Menu,
   User,
@@ -24,15 +25,42 @@ const navigation = [
   { name: "Inventory", href: "/admin/inventory", icon: PackageSearch },
   { name: "Pallets", href: "/admin/pallets", icon: Layers },
   { name: "Orders", href: "/admin/orders", icon: Package },
+  { name: "Invoices", href: "/admin/invoices", icon: Receipt },
   { name: "Reports", href: "/admin/reports", icon: FileText },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [newOrderCount, setNewOrderCount] = useState(0);
   const { user, loading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Unread order badge: count of orders no admin has opened yet, kept live
+  useEffect(() => {
+    const countNewOrders = async () => {
+      const { count } = await supabase
+        .from("outbound_orders")
+        .select("id", { count: "exact", head: true })
+        .is("viewed_at", null);
+      setNewOrderCount(count ?? 0);
+    };
+
+    countNewOrders();
+    const channel = supabase
+      .channel("admin-order-badge")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "outbound_orders" },
+        countNewOrders
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Redirect if not admin
   if (!loading && (!user || !isAdmin())) {
@@ -91,6 +119,11 @@ export default function AdminLayout() {
             >
               <item.icon className="h-4 w-4 flex-shrink-0" />
               <span>{item.name}</span>
+              {item.name === "Orders" && newOrderCount > 0 && (
+                <span className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                  {newOrderCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -171,6 +204,11 @@ export default function AdminLayout() {
               >
                 <item.icon className="h-4 w-4 flex-shrink-0" />
                 <span>{item.name}</span>
+                {item.name === "Orders" && newOrderCount > 0 && (
+                  <span className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                    {newOrderCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
