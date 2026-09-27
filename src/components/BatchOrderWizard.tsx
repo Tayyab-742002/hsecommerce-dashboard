@@ -21,6 +21,9 @@ import {
 } from "@/components/ui/collapsible";
 import { formatCurrency } from "@/lib/currency";
 import { createOrder } from "@/lib/createOrder";
+import ItemSearchInput, {
+  type InventoryOption,
+} from "@/components/ItemSearchInput";
 
 interface BatchOrderWizardProps {
   onComplete: () => void;
@@ -40,106 +43,6 @@ interface BatchOrder {
   special_instructions: string;
   pick_and_pack_rate?: number;
   items: BatchOrderItem[];
-}
-
-interface InventoryOption {
-  id: string;
-  item_code: string;
-  item_name: string;
-  quantity: number;
-  pallet_id: string | null;
-}
-
-function ItemSearchInput({
-  value,
-  inventory,
-  remainingFor,
-  onSelect,
-}: {
-  value: string;
-  inventory: InventoryOption[];
-  remainingFor: (id: string) => number;
-  onSelect: (id: string) => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Keep the input text in sync with the selected item
-  useEffect(() => {
-    const selected = inventory.find((i) => i.id === value);
-    setSearch(selected ? `${selected.item_name} (${selected.item_code})` : "");
-  }, [value, inventory]);
-
-  const q = search.toLowerCase();
-  const filtered = inventory.filter(
-    (i) =>
-      i.item_name?.toLowerCase().includes(q) ||
-      i.item_code?.toLowerCase().includes(q)
-  );
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative"
-      onBlur={(e) => {
-        if (!containerRef.current?.contains(e.relatedTarget as Node)) {
-          setOpen(false);
-          const selected = inventory.find((i) => i.id === value);
-          setSearch(
-            selected ? `${selected.item_name} (${selected.item_code})` : ""
-          );
-        }
-      }}
-    >
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-      <Input
-        placeholder="Search item..."
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={(e) => {
-          setOpen(true);
-          e.target.select();
-        }}
-        className="pl-9"
-      />
-      {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
-          {filtered.length > 0 ? (
-            filtered.map((inv) => (
-              <div
-                key={inv.id}
-                className="flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-accent"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onSelect(inv.id);
-                  setSearch(`${inv.item_name} (${inv.item_code})`);
-                  setOpen(false);
-                }}
-              >
-                <span className="min-w-0 truncate">
-                  <span className="font-medium">{inv.item_name}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {inv.item_code}
-                  </span>
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  Available: {remainingFor(inv.id)}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
-              No matching items
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 const emptyOrder = (): BatchOrder => ({

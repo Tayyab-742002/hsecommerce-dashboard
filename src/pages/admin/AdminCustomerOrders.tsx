@@ -11,6 +11,13 @@ import Spinner from "@/components/Spinner";
 import TablePagination from "@/components/TablePagination";
 import OrderStatusDialog from "@/components/OrderStatusDialog";
 import OrderDetailsDialog from "@/components/OrderDetailsDialog";
+import BulkLabelWizard from "@/components/BulkLabelWizard";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Accordion,
   AccordionContent,
@@ -49,6 +56,7 @@ import {
   ArrowLeft,
   CheckCheck,
   Download,
+  Layers,
   FileArchive,
   Files,
   Folder,
@@ -311,6 +319,7 @@ export default function AdminCustomerOrders() {
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const [markAllOpen, setMarkAllOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   useEffect(() => {
     if (!customerId) return;
@@ -567,16 +576,27 @@ export default function AdminCustomerOrders() {
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={unreadTotal === 0}
-          onClick={() => setMarkAllOpen(true)}
-          className="w-full sm:w-auto"
-        >
-          <CheckCheck className="mr-2 h-4 w-4" />
-          Mark all read
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBulkOpen(true)}
+            className="w-full sm:w-auto"
+          >
+            <Layers className="mr-2 h-4 w-4" />
+            Bulk labels
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={unreadTotal === 0}
+            onClick={() => setMarkAllOpen(true)}
+            className="w-full sm:w-auto"
+          >
+            <CheckCheck className="mr-2 h-4 w-4" />
+            Mark all read
+          </Button>
+        </div>
       </div>
 
       {/* View switch */}
@@ -780,6 +800,22 @@ export default function AdminCustomerOrders() {
           })}
         </Accordion>
       )}
+
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk upload labels</DialogTitle>
+          </DialogHeader>
+          <BulkLabelWizard
+            customerId={customerId}
+            adminMode
+            onComplete={() => {
+              setBulkOpen(false);
+              refreshAll();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {statusTarget && (
         <OrderStatusDialog

@@ -10,6 +10,7 @@ import Spinner from "@/components/Spinner";
 import TablePagination from "@/components/TablePagination";
 import OrderDetailsDialog from "@/components/OrderDetailsDialog";
 import OrderWizard, { type OrderWizardInitial } from "@/components/OrderWizard";
+import BulkLabelWizard from "@/components/BulkLabelWizard";
 import {
   Accordion,
   AccordionContent,
@@ -56,6 +57,7 @@ import {
   Files,
   Folder,
   Plus,
+  Layers,
   RotateCcw,
   Search,
   Truck,
@@ -313,6 +315,7 @@ export default function CustomerOrders() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [reorderFrom, setReorderFrom] = useState<
     OrderWizardInitial | undefined
   >();
@@ -631,17 +634,28 @@ export default function CustomerOrders() {
             Create orders and track them through to delivery
           </p>
         </div>
-        <Button
-          className="w-full sm:w-auto"
-          disabled={!customerId}
-          onClick={() => {
-            setReorderFrom(undefined);
-            setCreateOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Create Order
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={!customerId}
+            onClick={() => setBulkOpen(true)}
+          >
+            <Layers className="mr-2 h-4 w-4" />
+            Bulk Upload Labels
+          </Button>
+          <Button
+            className="w-full sm:w-auto"
+            disabled={!customerId}
+            onClick={() => {
+              setReorderFrom(undefined);
+              setCreateOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Order
+          </Button>
+        </div>
       </div>
 
       {/* Summary */}
@@ -921,6 +935,23 @@ export default function CustomerOrders() {
               initialOrder={reorderFrom}
               onComplete={() => {
                 closeWizard();
+                refresh();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk upload labels</DialogTitle>
+          </DialogHeader>
+          {customerId && (
+            <BulkLabelWizard
+              customerId={customerId}
+              onComplete={() => {
+                setBulkOpen(false);
                 refresh();
               }}
             />
